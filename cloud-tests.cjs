@@ -26,6 +26,7 @@ files=files.filter(f=>f.id!=='new-source');await engine.sync();ok(engine.records
 const changedFiles=files.map(f=>f.id===incoming[0].sourceFileId?{...f,modifiedTime:'original-v2'}:f);const changed=C.buildIncoming(index,manual,changedFiles).find(r=>r.id===incoming[0].id);ok(changed.thumbnailStale&&changed.metrics===null&&changed.needsReview);
 const query={tags:{cuisine:'日料',scene:'食物＋环境',framing:'单道菜',focus:'食物主导',light:'自然光'},whiteBalance:'unknown'};const result=C.rankReferences(query,incoming);assert.ok(result.choices.length<=3);ok(result.choices.every(r=>r.reasons.length&&!r.excluded.length));
 if(dir){ok(result.excluded.some(r=>r.reference.name==='06-arcade-film.jpg'));ok(result.choices.every(r=>!['07-pizza-flash.jpg','08-sandwich-flash.jpg'].includes(r.reference.name)));ok(result.choices[0].reference.name==='09-sashimi.jpg');}
+assert.equal(C.rankReferences({tags:{}},incoming).choices.length,0);tests++;
 const unknown=C.cleanTags({cuisine:'impossible',light:'yellow'});ok(Object.values(unknown).every(v=>v==='待确认'));
 const visual={tags:query.tags,evidence:[],references:incoming.map(r=>({id:r.id,suitable:true,reasons:['fixture only'],limitations:[]}))};ok(Object.values(C.validateVisualResult(visual,incoming).tags).every(v=>v==='待确认'));
 assert.throws(()=>C.validateVisualResult({...visual,references:[{id:'hallucination',suitable:true,reasons:['x'],limitations:[]}]},incoming));tests++;

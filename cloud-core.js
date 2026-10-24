@@ -3,7 +3,7 @@
 'use strict';
 const UNKNOWN='待确认';
 const tagValues={cuisine:['待确认','川菜','粤菜','中餐其他','日料','韩餐','西餐','火锅','烧烤','甜品','饮品'],scene:['待确认','纯食物','人物＋食物','食物＋环境','人物＋食物＋环境','纯环境'],framing:['待确认','特写','单道菜','局部餐桌','整桌合集','空间全景'],focus:['待确认','食物主导','人物主导','环境主导','并重'],light:['待确认','自然光','暖灯','混合光','暗光','直闪']};
-function cleanTags(tags={}){return Object.fromEntries(Object.entries(tagValues).map(([k,v])=>[k,v.includes(tags[k])?tags[k]:UNKNOWN]));}
+function cleanTags(tags={}){tags=tags||{};return Object.fromEntries(Object.entries(tagValues).map(([k,v])=>[k,v.includes(tags[k])?tags[k]:UNKNOWN]));}
 function validateIndex(j,folderId){if(!j||j.kind!=='shirley-drive-library-index'||j.schema!==1||j.folderId!==folderId||!Array.isArray(j.references)||j.references.length>2000)throw Error('云端索引格式或文件夹不匹配');const ids=new Set();for(const r of j.references){if(!r.sourceFileId||r.id!=='drive:'+r.sourceFileId||ids.has(r.id)||typeof r.notes!=='string'||!r.tags)throw Error('云端索引含重复或无效素材');ids.add(r.id);}return j;}
 function manualRows(j){if(!j||!Array.isArray(j.references)||j.references.length>2000)throw Error('人工分析 JSON 格式无效');return j.references;}
 function fileName(f){return f.name||f.title||'';}
@@ -22,11 +22,13 @@ function foodPerson(s){return /人物/.test(s||'');}
 function assessReference(query,ref){const t=cleanTags(query.tags||query),r=ref.tags||{},constraints=ref.constraints||{},reasons=[],warnings=[],excluded=[];let score=0;
 if(ref.remoteMissing||ref.archived)excluded.push('该素材已不在云端当前集合');if(ref.needsReview)excluded.push(ref.reviewReason||'素材分析待补充／复核');
 for(const [k,values]of Object.entries(constraints.exclude||{}))if(positive(t[k])&&values.includes(t[k]))excluded.push(`人工不适用条件：${k}=${t[k]}`);
+if(query.mode!=='ai'&&positive(t.cuisine)&&positive(r.cuisine)&&(['甜品','饮品'].includes(t.cuisine)||['甜品','饮品'].includes(r.cuisine))&&t.cuisine!==r.cuisine)excluded.push('规则模式不跨饮品／甜品与正餐品类迁移；需视觉 AI 进一步核对');
 if(knownSceneFood(t.scene)&&r.scene==='纯环境')excluded.push('原图为食物内容；该参考为环境，不用于食物颜色校准');if(t.scene==='纯环境'&&knownSceneFood(r.scene))excluded.push('原图为纯环境，该参考依赖食物主体');
 // Conservative explicit phrases in full legacy notes remain active after a note update invalidates structured rules.
 const notes=ref.notes||'';
 if(t.light==='暗光'&&/不适合[^。；]*(昏暗|暗室)/.test(notes))excluded.push('人工说明排除了昏暗／暗室条件');
-if(t.light==='混合光'&&/不适合[^。；]*混合光/.test(notes))excluded.push('人工说明排除了混合光');
+if(t.light==='混合光'&&/不适合[^。；]*混[合光]/.test(notes))excluded.push('人工说明排除了混合光');
+if(positive(t.light)&&t.light!=='直闪'&&/不适合[^。；]*(柔光|无闪光)/.test(notes))excluded.push('人工说明排除了柔光／无闪光条件，真实闪光不能通过调色补造');
 if(['特写','单道菜'].includes(t.framing)&&/不适合[^。；]*单盘/.test(notes))excluded.push('人工说明排除了单盘近景');
 if((query.metrics?.hi||0)>.06&&/不适合[^。；]*高光已溢出/.test(notes))excluded.push('原图高亮像素较多，该参考不适用于已溢出的高光');
 for(const [k,weight,label]of [['scene',8,'画面内容'],['framing',6,'取景'],['focus',5,'主体重点'],['light',6,'拍摄条件'],['cuisine',3,'菜系／品类']]){if(positive(t[k])&&positive(r[k])){if(t[k]===r[k]){score+=weight;reasons.push(`${label}一致：${t[k]}`)}else{score-=k==='cuisine'?1:3;warnings.push(`${label}不同：原图 ${t[k]}／参考 ${r[k]}`)}}}
@@ -35,8 +37,8 @@ if(foodPerson(r.scene)&&positive(t.scene)&&!foodPerson(t.scene)){score-=8;warnin
 const qm=query.metrics,rm=ref.metrics;if(qm&&rm){const d=Math.abs(qm.mean-rm.mean)/255+Math.abs(qm.contrast-rm.contrast)/128;score+=Math.max(-2,2-d*3);warnings.push('亮度与对比测量仅作低权重辅助，不代表光源或风格识别');}
 if(query.whiteBalance==='unknown')warnings.push('白平衡缺少可靠中性色依据，保持待确认');
 const known=Object.values(t).filter(positive).length;let confidence='信息不足';if(known>=3&&reasons.length>=2)confidence='有标签依据';if(query.mode==='ai'&&known>=3&&reasons.length>=2)confidence='视觉分析＋人工资料支持';if(!reasons.length)reasons.push('原图语义标签尚未确认，只能作为待核对参考');
-return {reference:ref,score,reasons,warnings:[...new Set(warnings)],excluded:[...new Set(excluded)],confidence,dependencies:constraints.dependencies||[],conditions:constraints.requires||[],mode:query.mode==='ai'?'ai-assisted':'rules'};}
-function rankReferences(query,refs){const all=refs.map(r=>assessReference(query,r));return {choices:all.filter(c=>!c.excluded.length).sort((a,b)=>b.score-a.score).slice(0,3),excluded:all.filter(c=>c.excluded.length),mode:query.mode==='ai'?'ai-assisted':'rules'};}
+return {reference:ref,score,reasons,warnings:[...new Set(warnings)],excluded:[...new Set(excluded)],confidence,dependencies:constraints.dependencies||[...notes.matchAll(/依赖[：:]?([^。]+)/g)].map(m=>m[1]),conditions:constraints.requires||[...notes.matchAll(/(?:^|[。；])适合([^。；]+)/g)].map(m=>'适合'+m[1]),mode:query.mode==='ai'?'ai-assisted':'rules'};}
+function rankReferences(query,refs){const all=refs.map(r=>assessReference(query,r));const t=cleanTags(query.tags||query);if(query.mode!=='ai'&&(!positive(t.scene)||Object.values(t).filter(positive).length<2))return {choices:[],excluded:all.filter(c=>c.excluded.length),mode:'rules',pending:'请确认画面内容及至少另一项语义标签，或连接视觉 AI；不依据像素统计排列参考。'};return {choices:all.filter(c=>!c.excluded.length).sort((a,b)=>b.score-a.score).slice(0,3),excluded:all.filter(c=>c.excluded.length),mode:query.mode==='ai'?'ai-assisted':'rules'};}
 function validateVisualResult(j,refs){if(!j||!j.tags||!Array.isArray(j.evidence)||!Array.isArray(j.references))throw Error('AI 响应结构无效');const ids=new Set(refs.map(r=>r.id));const seen=new Set();for(const r of j.references){if(!ids.has(r.id)||seen.has(r.id)||typeof r.suitable!=='boolean'||!Array.isArray(r.reasons)||!Array.isArray(r.limitations)||!r.reasons.length||r.reasons.some(x=>typeof x!=='string'||!x.trim())||r.limitations.some(x=>typeof x!=='string'))throw Error('AI 返回未知、重复或无依据参考');seen.add(r.id);}const tags=cleanTags(j.tags);for(const k of Object.keys(tags))if(tags[k]!==UNKNOWN&&!j.evidence.some(e=>e.field===k&&typeof e.observation==='string'&&e.observation.trim()))tags[k]=UNKNOWN;return {...j,tags};}
 function rankWithVisual(query,refs,visual){visual=validateVisualResult(visual,refs);const tagged={...query,tags:{...visual.tags,...Object.fromEntries(Object.entries(query.manualTags||{}).filter(([,v])=>positive(v)))},mode:'ai'};const all=refs.map(r=>assessReference(tagged,r));for(const c of all){const semantic=visual.references.find(r=>r.id===c.reference.id);if(!semantic){c.excluded.push('AI 未完成该参考的视觉核对');continue}if(!semantic.suitable)c.excluded.push(...(semantic.reasons.length?semantic.reasons:['AI 判定不适用，但未提供充分理由']));else if(!c.excluded.length){c.score+=Math.max(0,10-visual.references.indexOf(semantic));c.reasons.push(...semantic.reasons);c.warnings.push(...semantic.limitations)}}return {choices:all.filter(c=>!c.excluded.length).sort((a,b)=>b.score-a.score).slice(0,3),excluded:all.filter(c=>c.excluded.length),mode:'ai-assisted',tags:tagged.tags,evidence:visual.evidence};}
 return {UNKNOWN,tagValues,cleanTags,validateIndex,manualRows,normalizeFiles,buildIncoming,mergeRecords,assessReference,rankReferences,validateVisualResult,rankWithVisual};

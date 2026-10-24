@@ -27,7 +27,7 @@ The 9 original JPGs, full backup, and full original manual-analysis file remain 
 
 ## Recommendations and editing
 
-Upload triggers a recommendation report automatically. Without the gateway it explicitly displays **temporary rule mode**, keeps semantic fields `待确认`, uses confirmed tags + manual conditions and only weak brightness/contrast evidence. It never claims pixel statistics understand food or visual style. The environment-only arcade reference is excluded for food scenes; direct-flash references are penalized for non-flash originals. Unknown light/WB remain unknown. Updated notes invalidate the previous structured constraint snapshot until reviewed. The matcher returns up to three eligible references, never fills the list with excluded samples. Full notes, conditions, dependencies, sources, limitations and ordinal confidence are displayed.
+Upload triggers a recommendation report automatically. Without the gateway it explicitly displays **temporary rule mode**, keeps semantic fields `待确认`, uses confirmed tags + manual conditions and only weak brightness/contrast evidence. It never claims pixel statistics understand food or visual style. The environment-only arcade reference is excluded for food scenes; direct-flash references are penalized for non-flash originals. Unknown light/WB remain unknown. With insufficient semantic tags, rule mode refuses to rank by pixels alone; confirm scene plus another tag to proceed. It does not transfer drink/dessert references across meal categories without visual AI review. Updated notes invalidate the previous structured constraint snapshot until reviewed. The matcher returns up to three eligible references, never fills the list with excluded samples. Full notes, conditions, dependencies, sources, limitations and ordinal confidence are displayed.
 
 When configured, the gateway receives a reduced original plus all reference thumbnails and full notes (max 24 references, explicit limit), compares them jointly, and returns evidence-linked tags and suitability reasons. Unknown/duplicate reference IDs and ungrounded tag fields are rejected. Hard manual exclusions still apply after AI. AI failure visibly falls back to rules. No automatic original overwrite, no generative image edit, no food/person/room reconstruction. Cuisine is a semantic/protection layer, visual style owns global tone, layout owns borders/text; exposure or saturation are not added independently by each layer.
 
@@ -35,10 +35,14 @@ When configured, the gateway receives a reduced original plus all reference thum
 
 - Read all 9 real original JPGs, full human-analysis JSON and full backup privately through the connected Drive account; inspected real structures and images.
 - Verified private index and nine thumbnails after upload.
-- `SHIRLEY_FIXTURE_DIR=/private/fixture/path node cloud-tests.cjs`: 24 assertions using the actual 9 reference records and thumbnails; adapter identity migration, repeat sync/no repeated media reads, reload/cache restore, new/updated files, old notes history, removal preservation, original changes, auth/network/permission failures, food-vs-environment exclusion, soft-light flash demotion, sashimi preference, unknown labels, AI response validation. Transport is a controlled test double, NOT real website OAuth.
-- `node cloud-tests.cjs`: 21 synthetic assertions for portable regression tests.
+- `SHIRLEY_FIXTURE_DIR=/private/fixture/path node cloud-tests.cjs`: 25 assertions using the actual 9 reference records and thumbnails; adapter identity migration, repeat sync/no repeated media reads, reload/cache restore, new/updated files, old notes history, removal preservation, original changes, auth/network/permission failures, food-vs-environment exclusion, soft-light flash demotion, sashimi preference, unknown labels, AI response validation. Transport is a controlled test double, NOT real website OAuth.
+- `node cloud-tests.cjs`: 22 synthetic assertions for portable regression tests.
 - `node cloud-gateway-tests.mjs`: 6 mocked origin/auth/account/config/upstream/secret-isolation checks. No live paid AI call.
 - JavaScript syntax checks for all modules and all existing inline scripts.
+
+## Deployed browser checks
+
+Chrome cloud browser: original nine local references retained, real JPG upload automatically opens the recommendation step, unknown semantic fields stay pending, manually confirmed sashimi tags select sashimi first and exclude environment references, reference selection preserves original data and all adjustment values (verified from exported projects), template/style/layout preview works, exported PNG/JPG are valid 1080×1440 files. This is local rule-mode testing, not website Drive sync.
 
 ## Acceptance still required
 
