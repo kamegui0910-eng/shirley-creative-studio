@@ -1,0 +1,18 @@
+{
+  "name": "Shirley 素材库",
+  "short_name": "素材库",
+  "description": "私有照片、视频与视觉参考库",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f3ed",
+  "theme_color": "#f5f3ed",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
