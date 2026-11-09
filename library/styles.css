@@ -4,3 +4,5 @@
 @media(max-width:700px){body{font-size:14px}.asset-body h3{font-size:14px}.badge,.asset-tags,.queue-detail,.section-heading>div p,.settings-panel .check-line,.field-note{font-size:12px}.button,.queue-actions button,.external-panel .button{font-size:13px;min-height:44px}.mobile-nav button{font-size:12px}.eyebrow{font-size:11px}.upload-controls label,.settings-panel>label{font-size:13px}.page-heading p{font-size:14px}.toast{font-size:13px}}
 
 :root{--muted:#596050}input::placeholder,textarea::placeholder{color:#68705f}.close-button{min-width:44px;min-height:44px}@media(max-width:700px){input,select,textarea,.settings-panel input,.settings-panel select,.settings-panel textarea{font-size:16px!important}.hero{min-height:180px;max-height:210px}.queue-actions button{min-height:44px}.dialog-close{width:44px;height:44px}}
+
+#computerHint{margin-bottom:14px}#computerEntry{margin-bottom:16px;width:100%}.upload-actions{gap:10px}.upload-actions .button{flex:1 1 160px}@media(max-width:700px){.upload-actions .button{flex:1 1 100%}}
