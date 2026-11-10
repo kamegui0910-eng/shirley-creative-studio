@@ -38,7 +38,7 @@ function received(response,total){
  return Number(m[1])+1;
 }
 export class DriveLibrary{
- constructor({token,fetcher=fetch,folderId='',sessionStore=memoryStore(),onProgress=()=>{}}={}){
+ constructor({token,fetcher=globalThis.fetch.bind(globalThis),folderId='',sessionStore=memoryStore(),onProgress=()=>{}}={}){
   if(typeof token!=='function')throw fail('config','需要当前 Google 授权读取函数');
   this.token=token;this.fetcher=fetcher;this.folderId=folderId?assertId(folderId):'';this.sessionStore=sessionStore;this.onProgress=onProgress;this.inflight=new Map();this.folderPending=null;
   if(!sessionStore||!['get','put','remove'].every(k=>typeof sessionStore[k]==='function'))throw fail('config','上传恢复存储接口无效');
