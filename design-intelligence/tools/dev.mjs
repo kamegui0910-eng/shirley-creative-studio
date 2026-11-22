@@ -1,0 +1,73 @@
+import { createServer } from 'node:http';
+import { Readable } from 'node:stream';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { openIndex } from './import.mjs';
+import worker, { tokenDigest } from '../src/worker.mjs';
+
+export function sqliteBinding(db) {
+  return { async batch(statements) {
+    db.exec('BEGIN');
+    try { const rows=statements.map(statement=>statement.run());db.exec('COMMIT');return rows;}
+    catch(error){db.exec('ROLLBACK');throw error;}
+  },prepare(sql) {
+    return { bind(...args) {
+      const statement = db.prepare(sql);
+      return { all: async () => ({ results: statement.all(...args) }), first: async () => statement.get(...args) ?? null, run:()=>statement.run(...args) };
+    } };
+  } };
+}
+
+export function localCache(directory) {
+  const base = resolve(directory);
+  return { async get(key) {
+    const path = resolve(base, key);
+    if (!path.startsWith(base + '/')) return null;
+    try {
+      if ((await stat(path)).isFile()) return { body: Readable.toWeb(createReadStream(path)) };
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    return null;
+  } };
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
+  const port = Number(process.env.PORT ?? 8787);
+  const token = process.env.DESIGN_DEV_TOKEN ?? randomBytes(32).toString('hex');
+  // `--demo` serves a synthetic index (no private Drive data) so the UI can be tried without the importer.
+  const demo = process.argv.includes('--demo');
+  if (demo) (await import('./seed-demo.mjs')).seedDemo('.local/demo');
+  const db = openIndex(process.env.DESIGN_DEV_DB ?? (demo ? '.local/demo/index.sqlite' : '.local/index.sqlite'));
+  const assets = localCache('public');
+  const types = { html: 'text/html', mjs: 'text/javascript', css: 'text/css' };
+  const env = {
+    DESIGN_DRIVE_CLIENT_ID:process.env.DESIGN_DRIVE_CLIENT_ID, DESIGN_DRIVE_PICKER_KEY:process.env.DESIGN_DRIVE_PICKER_KEY, DESIGN_DRIVE_APP_ID:process.env.DESIGN_DRIVE_APP_ID,
+    DB: sqliteBinding(db), DESIGN_UPLOAD_FOLDER: process.env.DESIGN_UPLOAD_FOLDER, DESIGN_UPLOAD_BRAND: process.env.DESIGN_UPLOAD_BRAND, CACHE: localCache(process.env.DESIGN_DEV_CACHE ?? (demo ? '.local/demo/cache' : '.local/cache')),
+    DESIGN_PRINCIPALS: JSON.stringify({ [await tokenDigest(token)]: { tenantId: 'studio', brandId: 'shirley', write: true } }),
+    STATIC: { async fetch(request) {
+      const name = new URL(request.url).pathname.slice(1) || 'index.html';
+      const file = await assets.get(name);
+      return file ? new Response(file.body, { headers: { 'Content-Type': types[name.split('.').at(-1)],
+        'Referrer-Policy':'strict-origin-when-cross-origin', 'Cross-Origin-Opener-Policy':'same-origin-allow-popups',
+        'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://apis.google.com https://docs.google.com; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com; frame-src https://accounts.google.com https://docs.google.com https://drive.google.com; style-src 'self' https://accounts.google.com/gsi/style; img-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" } }) : new Response(null, { status: 404 });
+    } }
+  };
+  createServer(async (req, res) => {
+    try {
+      const options = { method: req.method, headers: req.headers };
+      if (!['GET', 'HEAD'].includes(req.method)) Object.assign(options, { body: Readable.toWeb(req), duplex: 'half' });
+      const response = await worker.fetch(new Request(new URL(req.url, 'http://127.0.0.1:' + port), options), env);
+      res.writeHead(response.status, Object.fromEntries(response.headers));
+      if (response.body) Readable.fromWeb(response.body).pipe(res);
+      else res.end();
+    } catch {
+      res.writeHead(400).end();
+    }
+  }).listen(port, '127.0.0.1', () => {
+    console.log('Preview: http://127.0.0.1:' + port);
+    if (!process.env.DESIGN_DEV_TOKEN) console.log('Local preview token: ' + token);
+  });
+}

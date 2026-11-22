@@ -1,0 +1,26 @@
+// localStorage wrapper that never throws (private mode, quota, blocked storage). Tokens are never stored here.
+const PREFIX = 'shirley-di:';
+
+export function createStorage(area = globalThis.localStorage) {
+  const read = key => { try { return JSON.parse(area.getItem(PREFIX + key)); } catch { return null; } };
+  const write = (key, value) => { try { area.setItem(PREFIX + key, JSON.stringify(value)); return true; } catch { return false; } };
+  const remove = key => { try { area.removeItem(PREFIX + key); } catch { /* storage unavailable */ } };
+  return {
+    loadDraft: () => read('draft:v1'),
+    saveDraft: draft => write('draft:v1', draft),
+    clearDraft: () => remove('draft:v1'),
+    // Theme presets are local to this browser, keyed by style id.
+    loadPresets: styleId => { const all = read('presets:v1'); return Array.isArray(all?.[styleId]) ? all[styleId] : []; },
+    savePreset(styleId, preset) {
+      const all = read('presets:v1') ?? {};
+      const list = (Array.isArray(all[styleId]) ? all[styleId] : []).filter(item => item.name !== preset.name);
+      all[styleId] = [...list, preset].slice(-20);
+      return write('presets:v1', all);
+    },
+    deletePreset(styleId, name) {
+      const all = read('presets:v1') ?? {};
+      all[styleId] = (Array.isArray(all[styleId]) ? all[styleId] : []).filter(item => item.name !== name);
+      return write('presets:v1', all);
+    }
+  };
+}

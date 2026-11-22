@@ -1,0 +1,2693 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Shirley Design API",
+    "version": "1.2.0"
+  },
+  "security": [
+    {
+      "DesignToken": []
+    }
+  ],
+  "paths": {
+    "/session": {
+      "get": {
+        "operationId": "getSession",
+        "responses": {
+          "200": {
+            "description": "Current authenticated scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tenantId": {
+                      "type": "string"
+                    },
+                    "brandId": {
+                      "type": "string"
+                    },
+                    "write": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "tenantId",
+                    "brandId",
+                    "write"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/styles": {
+      "get": {
+        "operationId": "listStyles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Style"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categories": {
+      "get": {
+        "operationId": "listCategories",
+        "parameters": [
+          {
+            "name": "style",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Category"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/search": {
+      "get": {
+        "operationId": "searchAssets",
+        "parameters": [
+          {
+            "name": "style",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+              }
+            },
+            "description": "Repeatable. OR within styles, AND with categories."
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+              }
+            },
+            "description": "Repeatable. OR within categories."
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "reference",
+                "component"
+              ]
+            }
+          },
+          {
+            "name": "rights",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "reference_only",
+                "unverified",
+                "restricted",
+                "commercial_ready"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 150
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 24
+            }
+          },
+          {
+            "name": "tenantId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          },
+          {
+            "name": "brandId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          },
+          {
+            "name": "color",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^#[A-Fa-f0-9]{6}$"
+            },
+            "description": "Exact normalized palette color."
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 150
+            },
+            "description": "Alias for q. q takes priority."
+          },
+          {
+            "name": "styleId",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,100}$"
+              }
+            },
+            "description": "Alias for style."
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,100}$"
+              }
+            },
+            "description": "Alias for category."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AssetSummary"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/{id}": {
+      "get": {
+        "operationId": "getAsset",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/brands/{id}/design-rules": {
+      "get": {
+        "operationId": "getBrandRules",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tenantId": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                    },
+                    "brandId": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                    },
+                    "rules": {
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "tenantId",
+                    "brandId",
+                    "rules"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}": {
+      "get": {
+        "operationId": "getRecipe",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveRecipe",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recipe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Recipe version conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Use version 0 to create and the last read version to update.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecipeInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}/publication-check": {
+      "get": {
+        "operationId": "checkPublication",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "allowed": {
+                      "type": "boolean"
+                    },
+                    "blockers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                      }
+                    }
+                  },
+                  "required": [
+                    "allowed",
+                    "blockers"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/{id}/preview": {
+      "get": {
+        "operationId": "getPreview",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/{id}/vector": {
+      "get": {
+        "operationId": "getVector",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}/history": {
+      "get": {
+        "operationId": "listRecipeHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "nextBefore": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextBefore"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}/history/{version}": {
+      "get": {
+        "operationId": "getRecipeHistoryVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}/restore": {
+      "post": {
+        "operationId": "restoreRecipeVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recipe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Recipe version conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "restoreVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "version",
+                  "restoreVersion"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/{id}/analysis": {
+      "get": {
+        "operationId": "getAssetAnalysis",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "enum": [
+                        "ready",
+                        "pending"
+                      ]
+                    },
+                    "result": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/VisualGeometry"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fileVersion": {
+                      "type": "string"
+                    },
+                    "modelVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "result",
+                    "fileVersion",
+                    "modelVersion"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "operationId": "writeAssetAnalysis",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stored": {
+                      "type": "boolean"
+                    },
+                    "modelVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "stored",
+                    "modelVersion"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid analysis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Asset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Asset version changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stored": {
+                      "type": "boolean"
+                    },
+                    "modelVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "stored",
+                    "modelVersion"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fileVersion": {
+                    "type": "string"
+                  },
+                  "result": {
+                    "$ref": "#/components/schemas/VisualGeometry"
+                  }
+                },
+                "required": [
+                  "fileVersion",
+                  "result"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/assets/recommend": {
+      "post": {
+        "operationId": "recommendAssets",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recommendation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recommendation query",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "q": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "visual": {
+                    "$ref": "#/components/schemas/VisualGeometry"
+                  },
+                  "purpose": {
+                    "enum": [
+                      "internal",
+                      "commercial"
+                    ]
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-dna": {
+      "get": {
+        "operationId": "getDesignDna",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "global": {
+                      "$ref": "#/components/schemas/DesignDNA"
+                    },
+                    "effective": {
+                      "$ref": "#/components/schemas/DesignDNA"
+                    }
+                  },
+                  "required": [
+                    "global",
+                    "effective"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateBrandDna",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDNA"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid DNA settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignDNA"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intake/config": {
+      "get": {
+        "operationId": "getDriveIntakeConfig",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "folder": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "oauth": {
+                      "type": "object",
+                      "description": "Present for the configured upload operator only. Contains public settings for the existing Google web client.",
+                      "required": [
+                        "clientId"
+                      ],
+                      "properties": {
+                        "clientId": {
+                          "type": "string"
+                        },
+                        "picker": {
+                          "type": "object",
+                          "required": [
+                            "key",
+                            "appId"
+                          ],
+                          "properties": {
+                            "key": {
+                              "type": "string"
+                            },
+                            "appId": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "folder"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/intake/dedupe": {
+      "get": {
+        "operationId": "findIntakeFingerprint",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "assetId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "assetId"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid fingerprint",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "fingerprint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        ]
+      }
+    },
+    "/intake/register": {
+      "post": {
+        "operationId": "registerDriveReceipt",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing receipt or credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Receipt could not be verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Intake folder unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntakeReceipt"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "driveFileId": {
+                    "type": "string"
+                  },
+                  "fingerprint": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  }
+                },
+                "required": [
+                  "driveFileId",
+                  "fingerprint"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Drive-Access-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "password"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "DesignToken": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "Style": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "colors": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "tokens": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "tokenCompatibility": {
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "colors",
+          "tokens",
+          "tokenCompatibility"
+        ]
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ]
+      },
+      "AssetSummary": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "driveFileId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reference",
+              "component"
+            ]
+          },
+          "rights": {
+            "type": "string",
+            "enum": [
+              "reference_only",
+              "unverified",
+              "restricted",
+              "commercial_ready"
+            ]
+          },
+          "review": {
+            "enum": [
+              "pending",
+              "indexed",
+              "approved"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "hasPreview": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,100}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^#[A-Fa-f0-9]{6}$"
+            }
+          },
+          "styleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          },
+          "categoryIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          }
+        },
+        "required": [
+          "assetId",
+          "driveFileId",
+          "name",
+          "kind",
+          "rights",
+          "review",
+          "version",
+          "hasPreview"
+        ]
+      },
+      "AssetDetail": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "driveFileId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reference",
+              "component"
+            ]
+          },
+          "rights": {
+            "type": "string",
+            "enum": [
+              "reference_only",
+              "unverified",
+              "restricted",
+              "commercial_ready"
+            ]
+          },
+          "review": {
+            "enum": [
+              "pending",
+              "indexed",
+              "approved"
+            ]
+          },
+          "version": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "styles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "thumbnail",
+                    "preview",
+                    "vector"
+                  ]
+                },
+                "driveFileId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "driveFileId"
+              ]
+            }
+          },
+          "lineage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "assetId": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                },
+                "relation": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "assetId",
+                "relation"
+              ]
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "payload": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "kind",
+                "payload"
+              ]
+            }
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,100}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^#[A-Fa-f0-9]{6}$"
+            }
+          }
+        },
+        "required": [
+          "assetId",
+          "driveFileId",
+          "name",
+          "kind",
+          "rights",
+          "review",
+          "version",
+          "evidence",
+          "styles",
+          "categories",
+          "variants",
+          "lineage",
+          "sources"
+        ]
+      },
+      "RecipeInput": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "style": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "accent": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "components": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": {
+              "type": "object",
+              "properties": {
+                "assetId": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                },
+                "layout": {
+                  "$ref": "#/components/schemas/ComponentLayout"
+                }
+              },
+              "required": [
+                "assetId"
+              ]
+            }
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "layout": {
+            "$ref": "#/components/schemas/RecipeLayout"
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeLayer"
+            }
+          },
+          "theme": {
+            "$ref": "#/components/schemas/RecipeTheme"
+          }
+        },
+        "required": [
+          "title",
+          "style",
+          "accent",
+          "components",
+          "version"
+        ]
+      },
+      "Recipe": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "document": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "style": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+              },
+              "accent": {
+                "type": "string",
+                "pattern": "^#[a-fA-F0-9]{6}$"
+              },
+              "components": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 12,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "assetId": {
+                      "type": "string",
+                      "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                    },
+                    "layout": {
+                      "$ref": "#/components/schemas/ComponentLayout"
+                    }
+                  },
+                  "required": [
+                    "assetId"
+                  ]
+                }
+              },
+              "layout": {
+                "$ref": "#/components/schemas/RecipeLayout"
+              },
+              "layers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RecipeLayer"
+                }
+              },
+              "theme": {
+                "$ref": "#/components/schemas/RecipeTheme"
+              }
+            },
+            "required": [
+              "title",
+              "style",
+              "accent",
+              "components"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "updatedAt",
+          "document"
+        ]
+      },
+      "ComponentLayout": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 2
+          },
+          "y": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 2
+          },
+          "scale": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 8
+          },
+          "rotation": {
+            "type": "number",
+            "minimum": -360,
+            "maximum": 360
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "scale",
+          "rotation"
+        ]
+      },
+      "RecipeLayout": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 2048
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 2048
+          },
+          "background": {
+            "type": "string",
+            "pattern": "^#[A-Fa-f0-9]{6}$"
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ]
+      },
+      "RecipeLayer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,100}$"
+          },
+          "componentIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "componentIndex"
+        ]
+      },
+      "RecipeTheme": {
+        "type": "object",
+        "properties": {
+          "colors": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^#[A-Fa-f0-9]{6}$"
+            }
+          },
+          "tokens": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        },
+        "required": []
+      },
+      "VisualGeometry": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "const": "pixels-v1"
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "hex": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$"
+                },
+                "share": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              },
+              "required": [
+                "hex",
+                "share"
+              ]
+            },
+            "maxItems": 6
+          },
+          "colorTokens": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            }
+          },
+          "layout": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "density": {
+                "type": "array",
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "minItems": 16,
+                "maxItems": 16
+              }
+            },
+            "required": [
+              "width",
+              "height",
+              "density"
+            ]
+          },
+          "typography": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "unverified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "components": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "unverified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        },
+        "required": [
+          "model",
+          "palette",
+          "layout"
+        ]
+      },
+      "DesignDNA": {
+        "type": "object",
+        "properties": {
+          "weights": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "color": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "layout": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "brand": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "text",
+              "color",
+              "layout",
+              "brand"
+            ]
+          },
+          "styleIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 12
+          },
+          "palette": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "maxItems": 12
+          }
+        },
+        "required": [
+          "weights",
+          "styleIds",
+          "palette"
+        ]
+      },
+      "Recommendation": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string"
+          },
+          "exhaustive": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "assetId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "rights": {
+                  "type": "string"
+                },
+                "score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "signals": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                }
+              },
+              "required": [
+                "assetId",
+                "name",
+                "rights",
+                "score",
+                "signals"
+              ]
+            }
+          }
+        },
+        "required": [
+          "model",
+          "exhaustive",
+          "items"
+        ]
+      },
+      "IntakeReceipt": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "duplicate": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "assetId",
+          "duplicate"
+        ]
+      }
+    }
+  }
+}
