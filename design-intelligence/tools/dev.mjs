@@ -33,11 +33,14 @@ export function localCache(directory) {
 if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
   const port = Number(process.env.PORT ?? 8787);
   const token = process.env.DESIGN_DEV_TOKEN ?? randomBytes(32).toString('hex');
-  const db = openIndex('.local/index.sqlite');
+  // `--demo` serves a synthetic index (no private Drive data) so the UI can be tried without the importer.
+  const demo = process.argv.includes('--demo');
+  if (demo) (await import('./seed-demo.mjs')).seedDemo('.local/demo');
+  const db = openIndex(process.env.DESIGN_DEV_DB ?? (demo ? '.local/demo/index.sqlite' : '.local/index.sqlite'));
   const assets = localCache('public');
   const types = { html: 'text/html', mjs: 'text/javascript', css: 'text/css' };
   const env = {
-    DB: sqliteBinding(db), CACHE: localCache('.local/cache'),
+    DB: sqliteBinding(db), CACHE: localCache(process.env.DESIGN_DEV_CACHE ?? (demo ? '.local/demo/cache' : '.local/cache')),
     DESIGN_PRINCIPALS: JSON.stringify({ [await tokenDigest(token)]: { tenantId: 'studio', brandId: 'shirley', write: true } }),
     STATIC: { async fetch(request) {
       const name = new URL(request.url).pathname.slice(1) || 'index.html';

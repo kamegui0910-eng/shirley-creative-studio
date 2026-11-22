@@ -14,6 +14,17 @@ npm run dev
 
 Open the loopback URL printed by the server and enter its locally generated token. The library reads SQLite and local SVG/PNG cache files. Each save uses the last recipe version, and the recipe ID restores the editable composition. The browser uses SVG image decoding and Canvas 2D. The renderer is isolated from the editor state for a later Fabric.js integration.
 
+## Preview and recipe editor UI
+
+`public/` is a no-build ES-module app (strict CSP: no inline script/style, no CDN). Open the dev URL, enter the token, then:
+
+- **素材库**: Style × Category browsing, name search, kind and rights filters, pagination, lazy PNG previews, detail dialog (SVG with the current theme, PNG preview, rights, Drive IDs, lineage, source records).
+- **设计配方**: add / replace / reorder / duplicate / remove, undo/redo, Canvas 2D composition, PNG export, save/restore with optimistic versioning, local draft recovery, retry on failure.
+- **品牌配色与 Token**: palette and token overrides applied to the SVG text, local presets, CSS-variable export. Only the primary color persists as the recipe `accent`; see [`docs/UI_API_CONTRACT.md`](docs/UI_API_CONTRACT.md) for what is local-only and the proposed API additions.
+- Below 900px the three panels become bottom tabs.
+
+Try it without private data: `npm run dev:demo` serves a synthetic index (30 components in two kits, restricted / commercial-ready / no-preview / 404-preview cases). `npm test` runs unit tests and a Chromium end-to-end suite against that synthetic index (skipped automatically if Playwright is unavailable).
+
 ### Read-only Drive input
 
 The importer expects `.local/input/inventory.json`, an array of `{id,path,mime_type,created_time,modified_time,area}` rows. `area` is `ui` for the two-kit library and `reference` for the reference folder. List these two folders with pagination, preserving physical paths. Save the main index, Studio index, both Catalogs, both kit CSS files and all SVG bytes locally using the Drive ID as the filename. Optionally provide `descriptions.json` as an object keyed by Drive ID. No other media bytes are needed for the import. These files contain private data and are Git-ignored. The baseline test automatically runs when inputs are present. Set `DESIGN_TEST_INPUT` to require explicit fixtures in CI.

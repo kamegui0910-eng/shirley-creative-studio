@@ -1,1 +1,1 @@
-{"name":"shirley-design-intelligence","private":true,"type":"module","engines":{"node":">=24"},"scripts":{"test":"node --test --test-isolation=none","import":"node tools/import.mjs","dev":"node tools/dev.mjs"}}
+{"name":"shirley-design-intelligence","private":true,"type":"module","engines":{"node":">=24"},"scripts":{"test":"node --test --test-isolation=none","import":"node tools/import.mjs","dev":"node tools/dev.mjs","dev:demo":"node tools/dev.mjs --demo","seed:demo":"node tools/seed-demo.mjs"}}

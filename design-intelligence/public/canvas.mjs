@@ -6,3 +6,56 @@ export function drawComponent(ctx, image, x, y, width, height) {
   const drawnHeight = image.height * scale;
   ctx.drawImage(image, x + (width - drawnWidth) / 2, y + (height - drawnHeight) / 2, drawnWidth, drawnHeight);
 }
+
+export const STAGE = { width: 640, height: 480 };
+
+// Grid layout shared by painting and hit-testing. Same geometry as the Phase 1 preview.
+export function gridLayout(count, width = STAGE.width, height = STAGE.height, pad = 12) {
+  if (count < 1) return [];
+  const columns = Math.min(4, Math.ceil(Math.sqrt(count)));
+  const cellW = width / columns;
+  const cellH = height / Math.ceil(count / columns);
+  return Array.from({ length: count }, (_, i) => ({
+    x: (i % columns) * cellW + pad, y: Math.floor(i / columns) * cellH + pad, w: cellW - pad * 2, h: cellH - pad * 2
+  }));
+}
+
+export function hitTest(rects, x, y) {
+  for (let i = rects.length - 1; i >= 0; i--) {
+    const r = rects[i];
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return i;
+  }
+  return -1;
+}
+
+// images[i] === null marks an asset that failed to load: draw a labelled placeholder instead of aborting the frame.
+export function paintRecipe(ctx, { background, images, selected = -1, scale = 1 }) {
+  const { width, height } = STAGE;
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, width, height);
+  const rects = gridLayout(images.length);
+  images.forEach((image, index) => {
+    const r = rects[index];
+    if (image) { drawComponent(ctx, image, r.x, r.y, r.w, r.h); return; }
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = '#842754';
+    ctx.strokeRect(r.x, r.y, r.w, r.h);
+    ctx.fillStyle = '#842754';
+    ctx.font = '14px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('加载失败', r.x + r.w / 2, r.y + r.h / 2);
+    ctx.restore();
+  });
+  if (selected >= 0 && rects[selected]) {
+    const r = rects[selected];
+    ctx.save();
+    ctx.strokeStyle = '#892752';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8);
+    ctx.restore();
+  }
+  return rects;
+}

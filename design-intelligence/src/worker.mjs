@@ -155,7 +155,7 @@ export default {
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
-      if (['/', '/index.html', '/app.mjs', '/canvas.mjs', '/style.css'].includes(url.pathname)) return env.STATIC.fetch(request);
+      if (['/', '/index.html', '/app.mjs', '/canvas.mjs', '/style.css'].includes(url.pathname) || /^\/ui\/[\w-]+\.mjs$/.test(url.pathname)) return env.STATIC.fetch(request);
       const scope = await authorize(request, env);
       if (!scope) return failure('Authentication required', 401);
       return await route(request, env, url, scope);

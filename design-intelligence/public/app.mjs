@@ -1,193 +1,112 @@
-import { drawComponent } from './canvas.mjs';
+// Shirley Design Intelligence preview & recipe editor: session, wiring, responsive tabs.
+import { $, createStore, createAssetLoader, createFeedback } from './ui/core.mjs';
+import { createApi } from './ui/api.mjs';
+import { createStorage } from './ui/storage.mjs';
+import { createLibrary } from './ui/library.mjs';
+import { createDetail } from './ui/detail.mjs';
+import { createEditor } from './ui/editor.mjs';
+import { createThemePanel } from './ui/themepanel.mjs';
+import { emptyRecipe, createHistory, fingerprint } from './ui/recipe.mjs';
 
-const $ = id => document.getElementById(id);
-const state = { token: '', styles: [], components: [], slot: -1, version: 0, id: '', cursor: null, search: 0, frame: 0, categoryRequest: 0, saving: false };
-const urls = new WeakMap();
-const status = message => { $('status').textContent = message; };
-const run = action => Promise.resolve().then(action).catch(error => status(error.message));
-async function api(path, options = {}) {
-  const response = await fetch(path, { ...options, headers: { ...options.headers, Authorization: 'Bearer ' + state.token } });
-  if (!response.ok) throw Error((await response.json().catch(() => null))?.error ?? '请求失败');
-  return response;
-}
-async function data(path, options) { return (await api(path, options)).json(); }
-function options(select, items) {
-  select.replaceChildren(...items.map(item => new Option(item.label, item.id)));
-}
-function resetIdentity() {
-  state.id = '';
-  state.version = 0;
-  $('recipeId').value = '';
-}
-async function categories() {
-  const generation = ++state.categoryRequest;
-  const style = $('style').value;
-  const result = await data('/categories?style=' + encodeURIComponent(style));
-  if (generation !== state.categoryRequest) return;
-  options($('category'), [{ id: '', label: '全部分类' }, ...result.items]);
-  await search();
+const TOKEN_KEY = 'shirley-di:session-token';
+let token = '';
+let started = false;
+
+const feedback = createFeedback();
+const storage = createStorage();
+const store = createStore({ styles: [], history: createHistory(emptyRecipe()), savedFp: fingerprint(emptyRecipe()), selected: -1, replacing: false, saving: false });
+const actions = {};
+const api = createApi({ getToken: () => token, onAuthFailure: () => logout('访问令牌无效或已过期，请重新登录。', { force: true }) });
+const assets = createAssetLoader(api);
+const library = createLibrary({ api, assets, store, actions });
+const detail = createDetail({ api, assets, store, actions });
+const editor = createEditor({ api, assets, store, storage, feedback, actions });
+const themePanel = createThemePanel({ store, storage, feedback, editor });
+
+Object.assign(actions, {
+  openDetail: detail.open,
+  addAsset: editor.addAsset,
+  notify: feedback.toast,
+  browsedStyle: () => library.view().style,
+  syncLibraryStyle: id => library.setStyle(id, { fromRecipe: true }),
+  libraryStyleChanged(id) {
+    const recipe = store.get().history.present;
+    const style = store.get().styles.find(s => s.id === id);
+    if (style?.colors && !recipe.components.length && recipe.style !== id) editor.reset(editor.freshRecipe(id, recipe.title));
+  }
+});
+
+function showTab(name) {
+  $('app').dataset.tab = name;
+  document.querySelectorAll('#tabs [data-tab]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.tab === name)));
+  window.scrollTo({ top: 0 });
 }
 
-async function search(append = false) {
-  const generation = ++state.search;
-  const library = $('library');
-  if (!append) {
-    for (const image of library.querySelectorAll('img')) if (urls.has(image)) URL.revokeObjectURL(urls.get(image));
-    library.replaceChildren();
-    state.cursor = null;
-  }
-  $('more').hidden = true;
-  const params = new URLSearchParams({ style: $('style').value, kind: 'component', limit: '16' });
-  if ($('category').value) params.set('category', $('category').value);
-  if (state.cursor) params.set('cursor', state.cursor);
-  const result = await data('/assets/search?' + params);
-  if (generation !== state.search) return;
-  state.cursor = result.nextCursor;
-  $('more').hidden = !state.cursor;
-  for (const item of result.items) {
-    const button = document.createElement('button');
-    button.className = 'card';
-    const image = document.createElement('img');
-    image.alt = '';
-    button.append(image, item.name);
-    button.onclick = () => run(() => {
-      const component = { assetId: item.assetId, name: item.name };
-      if (state.slot >= 0) state.components[state.slot] = component;
-      else if (state.components.length < 12) state.components.push(component);
-      else throw Error('配方最多可添加 12 个组件');
-      refreshSlots();
-      return paint();
-    });
-    library.append(button);
-    run(async () => {
-      const path = '/assets/' + item.assetId + '/preview';
-      const response = await api(path);
-      const blob = await response.blob();
-      if (!image.isConnected) return;
-      const url = URL.createObjectURL(blob);
-      urls.set(image, url);
-      image.src = url;
-    });
-  }
+function showLogin(message = '') {
+  $('login').hidden = false;
+  $('app').hidden = true;
+  $('tabs').hidden = true;
+  $('logout').hidden = true;
+  $('login-error').textContent = message;
+  $('login-submit').disabled = false;
+  $('token').focus();
 }
-function refreshSlots() {
-  const slots = $('slots');
-  slots.replaceChildren();
-  state.components.forEach((item, index) => {
-    const button = document.createElement('button');
-    button.textContent = item.name ?? ('组件 ' + (index + 1));
-    button.setAttribute('aria-pressed', String(index === state.slot));
-    button.onclick = () => { state.slot = state.slot === index ? -1 : index; refreshSlots(); };
-    const remove = document.createElement('button');
-    remove.textContent = '移除';
-    remove.setAttribute('aria-label', '移除 ' + button.textContent);
-    remove.onclick = () => run(() => {
-      state.components.splice(index, 1);
-      state.slot = -1;
-      refreshSlots();
-      return paint();
-    });
-    slots.append(button, remove);
-  });
+
+async function logout(message = '', { force = false } = {}) {
+  if (!force && editor.hasWork() && !await feedback.confirm('当前配方有未保存更改（已保留本地草稿）。仍要退出？', '退出', '返回')) return;
+  token = '';
+  try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ }
+  assets.clear();
+  store.set({ styles: [] });
+  showLogin(message);
 }
-async function paint() {
-  const generation = ++state.frame;
-  const canvas = $('canvas');
-  const ctx = canvas.getContext('2d');
-  const style = state.styles.find(item => item.id === $('style').value);
-  const accent = $('accent').value;
-  const images = await Promise.all(state.components.map(async item => {
-    const response = await api('/assets/' + item.assetId + '/vector');
-    let svg = await response.text();
-    const original = style?.colors?.pink;
-    if (original && /^#[a-f0-9]{6}$/i.test(original)) svg = svg.replace(new RegExp(original + '(?![0-9a-f])', 'gi'), accent);
-    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
-    try {
-      const img = new Image();
-      img.src = url;
-      await img.decode();
-      return img;
-    } finally { URL.revokeObjectURL(url); }
-  }));
-  if (generation !== state.frame) return;
-  ctx.fillStyle = accent;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  if (!images.length) return;
-  const columns = Math.min(4, Math.ceil(Math.sqrt(images.length)));
-  const w = canvas.width / columns;
-  const h = canvas.height / Math.ceil(images.length / columns);
-  images.forEach((image, index) => drawComponent(ctx, image, index % columns * w + 12, Math.floor(index / columns) * h + 12, w - 24, h - 24));
+
+async function start() {
+  const styles = (await api.json('/styles')).items;
+  store.set({ styles });
+  const first = styles.find(s => s.colors) ?? styles[0];
+  library.renderStyles();
+  if (!started) {
+    started = true;
+    library.init();
+    editor.init();
+    themePanel.init();
+    $('logout').onclick = () => logout();
+    document.querySelectorAll('#tabs [data-tab]').forEach(button => { button.onclick = () => showTab(button.dataset.tab); });
+    addEventListener('offline', () => { $('conn').textContent = '离线'; $('conn').hidden = false; });
+    addEventListener('online', () => { $('conn').hidden = true; feedback.toast('网络已恢复'); });
+  }
+  $('login').hidden = true;
+  $('app').hidden = false;
+  $('tabs').hidden = false;
+  $('logout').hidden = false;
+  showTab('library');
+  if (!styles.length) { await library.search(); return; }
+  const recipe = editor.freshRecipe(first.colors ? first.id : '', '新设计');
+  editor.reset(recipe);
+  await library.setStyle(first.id, { fromRecipe: true });
+  await editor.offerDraft();
+}
+
+async function login(value, remember) {
+  token = value;
+  $('login-submit').disabled = true;
+  $('login-error').textContent = '';
+  try {
+    await start();
+    if (remember) { try { sessionStorage.setItem(TOKEN_KEY, token); } catch { /* storage unavailable */ } }
+    $('token').value = '';
+  } catch (error) {
+    token = '';
+    showLogin(error.kind === 'auth' ? '令牌无效，请检查后重试。' : error.message);
+  }
 }
 
 $('login').onsubmit = event => {
   event.preventDefault();
-  run(async () => {
-    state.token = $('token').value.trim();
-    state.styles = (await data('/styles')).items.filter(item => item.colors);
-    if (!state.styles.length) throw Error('当前品牌暂无组件风格');
-    options($('style'), state.styles);
-    $('accent').value = state.styles[0].colors.pink;
-    $('login').hidden = true;
-    $('workspace').hidden = false;
-    $('token').value = '';
-    status('');
-    await Promise.all([categories(), paint()]);
-  });
+  login($('token').value.trim(), $('remember').checked);
 };
-$('style').onchange = () => run(async () => {
-  ++state.search;
-  ++state.frame;
-  $('more').hidden = true;
-  if (state.components.length && !confirm('切换风格会清空画布。继续？')) {
-    $('style').value = $('style').dataset.active || state.styles[0].id;
-    await categories();
-    return;
-  }
-  $('style').dataset.active = $('style').value;
-  $('accent').value = state.styles.find(item => item.id === $('style').value).colors.pink;
-  state.components = [];
-  state.slot = -1;
-  resetIdentity();
-  refreshSlots();
-  status('');
-  await Promise.all([categories(), paint()]);
-});
-$('category').onchange = () => run(() => search());
-$('more').onclick = () => run(() => search(true));
-$('accent').oninput = () => run(paint);
-$('save').onclick = () => run(async () => {
-  if (state.saving) return;
-  state.saving = true;
-  const id = state.id || crypto.randomUUID();
-  const body = JSON.stringify({ title: $('title').value.trim(), style: $('style').value, accent: $('accent').value, components: state.components, version: state.version });
-  $('save').disabled = $('load').disabled = $('style').disabled = true;
-  try {
-    const result = await data('/design-recipes/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body });
-    state.id = result.id;
-    state.version = result.version;
-    $('recipeId').value = result.id;
-    status('配方已保存 · 版本 ' + result.version);
-  } finally {
-    state.saving = false;
-    $('save').disabled = $('load').disabled = $('style').disabled = false;
-  }
-});
-$('load').onclick = () => run(async () => {
-  const id = $('recipeId').value.trim();
-  if (!/^[\w-]{1,100}$/.test(id)) throw Error('请输入有效的配方 ID');
-  $('save').disabled = $('load').disabled = $('style').disabled = true;
-  let result;
-  try { result = await data('/design-recipes/' + id); }
-  finally { $('save').disabled = $('load').disabled = $('style').disabled = false; }
-  const recipe = result.document;
-  $('style').value = $('style').dataset.active = recipe.style;
-  $('accent').value = recipe.accent;
-  $('title').value = recipe.title;
-  $('recipeId').value = state.id = result.id;
-  state.version = result.version;
-  state.components = recipe.components;
-  state.slot = -1;
-  refreshSlots();
-  await Promise.all([categories(), paint()]);
-  status('已恢复配方 · 版本 ' + result.version);
-});
+
+let saved = '';
+try { saved = sessionStorage.getItem(TOKEN_KEY) ?? ''; } catch { /* storage unavailable */ }
+if (saved) login(saved, true); else $('token').focus();
