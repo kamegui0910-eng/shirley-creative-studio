@@ -22,9 +22,13 @@ function resetIdentity() {
 async function categories() {
   const generation = ++state.categoryRequest;
   const style = $('style').value;
+  const category = $('category');
+  category.disabled = true;
+  category.replaceChildren();
   const result = await data('/categories?style=' + encodeURIComponent(style));
   if (generation !== state.categoryRequest) return;
-  options($('category'), [{ id: '', label: '全部分类' }, ...result.items]);
+  options(category, [{ id: '', label: '全部分类' }, ...result.items]);
+  category.disabled = false;
   await search();
 }
 
