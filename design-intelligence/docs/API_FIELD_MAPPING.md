@@ -52,11 +52,61 @@
 - 图面读出 hex：9 项。内容重复（画面相同、md5 不同）：6082/6083、6084/6085、6131/6132。
 - 8 段 MOV：同一“鼻涕的韩系网页边框素材包”广告视频的不同预览页，见 `MOV_TODO.md`。
 
-## 6. 待 Codex 补（D1 / openapi）
+## 6. Codex D1 / openapi 映射（已读实测，2026-11-22）
 
-- `migrations/0001_index.sql` 的表结构与本表字段的逐项对应。
-- `openapi.json` 的 Asset schema 与 `rights` / `reviewStatus` 枚举是否一致；不一致时以本文件为准改 openapi，或双方确认后改索引。
-- 私有 D1 的导入：325 条完整 dev-index（含 Drive ID、md5、摘要）只进**受鉴权的 D1**，不进公开仓库。导入脚本见 Codex 的 `tools/import.mjs`。
+来源：`codex/design-intelligence-phase1` 的 `design-intelligence/openapi.json`（Shirley Design API v1.1.0，OpenAPI 3.1.0，认证 `DesignToken`）与 `migrations/0001_index.sql`（D1）。导入脚本见 Codex 的 `tools/import.mjs`。
+
+### 6.1 assets 表
+
+| D1 列 | dev-index v2 来源 | 备注 |
+|---|---|---|
+| `tenant_id` / `brand_id` | 无对应字段 | **由 Codex 定**，导入时必填 |
+| `asset_id` | 94 个 SVG → 公开 catalog 的 `id`（如 `ins:icons:heart`）；231 张参考图 → dev-index 的 `id`（即 `drive:<driveFileId>` 原样） | `UNIQUE(drive_id)` 与 dev-index 的 325 个唯一 Drive ID 一致 |
+| `drive_id` | `driveFileId` | 私有，只进 D1，不进公开仓库 |
+| `name` | `name` | |
+| `kind` | ui 库 SVG → `component`；ref 库 → `reference` | dev-index 无 kind 字段，按 `library` 推导 |
+| `version` | 无对应字段 | 建议首次导入填 `"1"`，由 Codex 确认 |
+| `rights` | 见 6.2 | **存在分歧，见下** |
+| `review` | 见 6.3 | |
+| `evidence` | `auditEvidence` / `summary` | 文本；`commercial_ready` 要求它非空（无记录符合） |
+
+### 6.2 rights 映射（含分歧）
+
+| dev-index `rights` | D1 `rights` | 说明 |
+|---|---|---|
+| `reference-only`（189） | `reference_only` | 直接对应 |
+| `unverified`（54） | `unverified` | 直接对应 |
+| `restricted`（32） | `restricted` | 直接对应 |
+| `original-vector`（40，像素套件） | **`unverified`**（evidence 注明 "catalog states original-vector; commercial use unverified"） | **D1 没有 original-vector 这一档**；绝不能写成 `commercial_ready`（D1 的 CHECK 要求 `review='approved'` 且 evidence 非空，且已验证可商用成品为 0） |
+| `needs-review`（10） | **`unverified` + `review='pending'`** | 权利信息不足，按未验证 + 待复核处理 |
+
+**`commercial_ready`：没有任何记录可以导入为该值。** 已验证已授权素材 0 个、可商用成品 0 个。
+
+### 6.3 review 映射
+
+| dev-index `reviewStatus` | D1 `review` | 说明 |
+|---|---|---|
+| `audited-indexed`（253） | `indexed` | 已审计入库，未经批准 |
+| `classified-unreviewed`（72） | `pending` | 人工目视分类、未经第二人复核；同时进 `classification_queue` 表（state=pending，evidence=分类 JSON） |
+
+**`approved`：没有任何记录可以直接导入为该值**，须人工签字确认后才升级。
+
+### 6.4 其他表
+
+- **styles / categories**：`style` S1–S6 → `styles(id, label)`；S1/S2 的 label 与色板已知（INS / 像素复古，见第 2 节）；S3–S6 的 label 未定义，由 Codex/Claude 定。`category` → `categories(id, label)`。
+- **asset_tags**：每表行只能带 style 或 category 其中之一（`CHECK((style_id IS NULL) <> (category_id IS NULL))`），所以每条素材需写**两行**（一行 style、一行 category）；`tag` 的取值由 Codex 定（建议直接用 style/category 的 id）。
+- **palettes**：S1/S2 的色板进 `palettes`（colors、tokens、`token_source`=catalog 文件名、`token_compatibility` 按 openapi `Style` 的同名字段）。
+- **asset_variants**：`preview` → `cache_key`=仓库预览路径（渲染 PNG 不是 Drive 文件）；`vector` → `drive_id`=SVG 的 Drive 文件；`thumbnail` → `drive_id`=`thumbnailFileId`（23 个 SVG 无 Drive 缩略图，无此 variant）。
+- **asset_sources**：`source_kind`=dev-index 的 `source`（如 `catalog-ins.json`），`source_key`=文件名，`payload`=catalog 条目 JSON。
+- **asset_lineage**：成品 ← 来源参考图（INS ← IMG_5969 + IMG_5971–5976；像素 ← IMG_6047 + IMG_6051）；`relation` 的取值词表由 Codex 定。
+- **sync_state**：`source`=`drive-library`，state JSON 存 `{pageToken: "4085", watermarkModifiedTime: "2026-11-22T05:04:33.488Z", inventorySha256: <见 sync-state.json>}`。
+- **`status`（已做成品等）与 `styleConfidence`（unclassified 130 / keyword 20 / catalog 94 / classified 72 / curated 9）在 D1 无对应列**：须放进 `evidence` JSON 或 `asset_sources` payload，不得悄悄丢弃；S6 桶（177 条）与低置信度记录照原值导入，不重新打标。
+
+### 6.5 openapi 对应关系
+
+- `AssetSummary`：`assetId`、`driveFileId`、`name`、`kind`、`rights`、`review`、`version`、`hasPreview`、`id`、`title`、`summary`、`colors`、`styleIds`、`categoryIds`——与上表一致；`AssetDetail` 另有 `evidence`、`styles`、`categories`、`variants`、`lineage`、`sources`。
+- 端点：`/assets/search`、`/assets/{id}`、`/assets/{id}/preview`、`/assets/{id}/vector`、`/styles`、`/categories`、`/brands/{id}/design-rules`、`/design-recipes/{id}` 及其 publication-check / history / restore。
+- 私有 D1 的导入：325 条完整 dev-index（含 Drive ID、md5、摘要）只进**受鉴权的 D1**，不进公开仓库。
 
 ## 7. 待 Claude 确认（UI 字段消费）
 

@@ -28,13 +28,12 @@
 
 ## 与 Codex、Claude 的交接状态
 
-- **Codex**：其 Phase 1 分支已有 API、D1 迁移与 openapi.json；本 PR 基于该分支，只做加法。字段映射文档中 D1 一栏待 Codex 补（Muse 尚未读到 openapi.json 与 0001_index.sql，见阻塞）。
+- **Codex**：其 Phase 1 分支已有 API、D1 迁移与 openapi.json；本 PR 基于 `main`，与 Codex 分支新增文件无重叠，可干净合并。字段映射文档第 6 节已按实测的 openapi.json（v1.1.0）与 `0001_index.sql` 写完，含两处分歧：`original-vector` 在 D1 无对应档（映射为 `unverified`，绝不能写 `commercial_ready`）；`approved` 无记录可直接导入。
 - **Claude**：其预览编辑器分支基于同一 Phase 1 包，含演示索引与 UI；本 PR 的 94 条真实 catalog 可替换其演示索引。UI 缺失值处理已写入映射文档第 2、7 节，待 Claude 确认。
 - **分歧处理**：接口以 `docs/API_FIELD_MAPPING.md` 为准；如 Codex 的 openapi 枚举与本文件不一致，双方确认后再改一边。
 
 ## 剩余阻塞
 
-1. **GitHub Contents 写入权限仍不足**：此前 `push_files` 返回 403（Muse GitHub App 无写入权限）。Shirley 已表示要开权限，正在等她操作；权限就绪后立即建分支、推 PR。不要重复无效推送。
-2. **Codex 契约未读到**：读取 `design-intelligence/openapi.json` 与 `migrations/0001_index.sql` 的授权在 12:30 ET 超时（用户未及时确认），按规则未重试；需 Shirley 再次确认后补读，补全映射文档第 6 节。
-3. **私有 bundle 链接有时效**：完整私有交付包链接 2026-11-24 17:03 UTC 过期，需在过期前转给 Codex；或由 Codex 将 325 条完整索引导入受鉴权的 D1 后以 D1 为准。
-4. **72 项待人工复核**：`reviewStatus=classified-unreviewed`，合进正式索引前需第二人复核。
+1. **GitHub Contents 写入权限已解决**：Shirley 安装了 Muse GitHub App（`meta-muse-ai`），分支已建、PR 已提交（见上）。
+2. **私有 bundle 链接有时效**：完整私有交付包链接 2026-11-24 18:10 UTC 过期，需在过期前转给 Codex；或由 Codex 将 325 条完整索引导入受鉴权的 D1 后以 D1 为准。
+3. **72 项待人工复核**：`reviewStatus=classified-unreviewed`，合进正式索引前需第二人复核；D1 中对应 `review='pending'` + `classification_queue`。
