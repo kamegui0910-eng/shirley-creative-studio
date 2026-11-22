@@ -35,3 +35,13 @@ Use the [Skill Registry](skill-registry.md) and [OpenAPI](../openapi.json). A Ga
 The authorized Google Drive connector can upload into the private sandbox folder and read the exact bytes back. `tools/export-verified-drive-intake.mjs` prepares an idempotent, private D1 batch from a verified connector receipt. Operators apply that batch only to the confirmed sandbox. This management-plane import keeps Google Drive as the source, stores a downscaled protected preview and deduplicates using the verified file content. No connector token enters the Worker or repository.
 
 This workflow is separate from browser resumable upload. The browser needs an existing Google OAuth client configured for the sandbox origin and a Google user connection with access to the private intake folder. A successful connector upload provides evidence for the management-plane workflow only.
+
+### Browser Google authorization
+
+The upload dialog supports the official Google Identity Services token model. Set the existing Google web OAuth client ID as `DESIGN_DRIVE_CLIENT_ID`. Its authorized JavaScript origins must include the exact sandbox origin. The app requests only `drive.file`, checks whether that app can write the configured folder, and holds the expiring Google token in memory.
+
+If the private folder was created under a different OAuth app and is invisible to this client, supply `DESIGN_DRIVE_PICKER_KEY` and `DESIGN_DRIVE_APP_ID` from the same Google Cloud project. The app ID is the numeric project number. The browser key should be restricted to Picker and the required website referrers, including the sandbox and Picker origin. Picker accepts only the preconfigured private folder, after which the app checks its write capability again. Neither a client secret nor a refresh token is used.
+
+The signed-in Google Drive connector does not deliver an OAuth authorization to the browser. The separate authenticated connector intake remains available. Local simulations cover consent callback, expiration, folder selection and resumable recovery. The test origin's unauthenticated CORS preflight passed. Provider-issued OAuth consent and authenticated `Location` and `Range` remain pending until the existing client is bound.
+
+References: [Google authorization client](https://developers.google.com/identity/oauth2/web/guides/get-google-api-clientid), [Picker](https://developers.google.com/workspace/drive/picker/guides/web-picker) and [Drive resumable uploads](https://developers.google.com/workspace/drive/api/guides/manage-uploads).

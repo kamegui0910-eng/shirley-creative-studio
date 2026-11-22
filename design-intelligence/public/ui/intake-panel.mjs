@@ -1,31 +1,105 @@
 import { $, el } from './core.mjs';
 import { analyzeImage } from './visual-features.mjs';
 import { fileFingerprint, uploadDrive } from './drive-upload.mjs';
+import { createDriveIdentity, driveFolderState, loadGoogleScript, selectDriveFolder } from './drive-identity.mjs';
 
 export function wireIntelligence({ api, actions }) {
   const dialog=$('intelligence-dialog');
+  const login=$('drive-connect'), picker=$('drive-picker'), status=$('upload-config');
+  let config, identity, authorizedFolder='', generation=0;
+  let connectedClient='';
+  const clear=()=>{
+    generation++;
+    identity?.clear();
+    identity=undefined;
+    connectedClient='';
+    authorizedFolder='';
+    config=undefined;
+    $('drive-token').value='';
+    picker.hidden=true;
+    if(dialog.open)dialog.close();
+  };
+  const check=async(token,current)=>{
+    const state=await driveFolderState(config.folder,token);
+    if(current!==generation)return;
+    authorizedFolder=state==='ready'?config.folder:'';
+    picker.hidden=state!=='needs-folder'||!config.oauth?.picker;
+    if(state==='expired')identity?.clear();
+    status.textContent=state==='ready'?'Google Drive 已连接，可以上传。':
+      state==='expired'?'Google 授权已过期，请重新连接。':
+      config.oauth?.picker?'请选择已配置的私有 Drive 测试目录。':'此 Google 应用尚未获得测试目录的写入权限。';
+  };
   $('intelligence-open').onclick=async()=>{
     dialog.showModal();
+    const current=++generation;
+    login.hidden=true;picker.hidden=true;
+    $('upload-submit').disabled=true;
     try{
-      const config=await api.json('/intake/config');
+      const settings=await api.json('/intake/config');
+      if(current!==generation)return;
+      config=settings;
       $('upload-submit').disabled=!config.enabled;
-      $('upload-config').textContent=config.enabled?'使用现有授权的 Google Drive 上传令牌。':'此环境尚未配置 Drive 上传文件夹。';
-    }catch(error){$('upload-config').textContent=error.message;}
+      if(!config.enabled){status.textContent='此环境尚未配置 Drive 上传文件夹。';return;}
+      if(!config.oauth){status.textContent='此测试环境尚未绑定 Google 网页客户端。可用已有应用令牌测试。';return;}
+      if(identity?.token()&&connectedClient===config.oauth.clientId){
+        login.hidden=false;await check(identity.token(),current);return;
+      }
+      status.textContent='准备 Google 登录…';
+      const tasks=[loadGoogleScript('https://accounts.google.com/gsi/client',()=>Boolean(globalThis.google?.accounts?.oauth2))];
+      if(config.oauth.picker)tasks.push(loadGoogleScript('https://apis.google.com/js/api.js',()=>Boolean(globalThis.gapi?.load)));
+      const [gis,loader]=await Promise.allSettled(tasks);
+      if(current!==generation)return;
+      if(gis.status==='rejected')throw gis.reason;
+      if(loader?.status==='rejected')config={...config,oauth:{clientId:config.oauth.clientId}};
+      identity?.clear();
+      identity=createDriveIdentity(config.oauth,globalThis.google);
+      connectedClient=config.oauth.clientId;
+      login.hidden=false;login.disabled=false;
+      status.textContent='连接 Google Drive 后即可检查目录访问权限。';
+    }catch(error){if(current===generation)status.textContent=error.message;}
+  };
+  login.onclick=async()=>{
+    if(!identity)return;
+    const current=generation;
+    login.disabled=true;
+    try{const token=await identity.connect();if(current===generation)await check(token,current);}
+    catch(error){if(current===generation)status.textContent=error.message;}
+    finally{if(current===generation)login.disabled=false;}
+  };
+  picker.onclick=async()=>{
+    const current=generation;
+    const token=identity?.token();
+    if(!token){status.textContent='请重新连接 Google Drive。';return;}
+    dialog.close();
+    try{
+      const picked=await selectDriveFolder({folder:config.folder,token,picker:config.oauth.picker,
+        google:globalThis.google,gapi:globalThis.gapi,origin:location.origin});
+      if(picked&&current===generation)await check(token,current);
+    }catch(error){if(current===generation)status.textContent=error.message;}
+    finally{if(current===generation&&!dialog.open)dialog.showModal();}
   };
   $('intelligence-close').onclick=()=>dialog.close();
   const sessionKey=(scope,digest)=>'shirley-upload:'+scope.tenantId+':'+scope.brandId+':'+digest;
   $('intake-form').onsubmit=async event=>{
     event.preventDefault();
-    const token=$('drive-token').value.trim();
+    const manual=$('drive-token').value.trim();
+    const token=manual||identity?.token();
+    const current=generation;
     const button=$('upload-submit');
     button.disabled=true;
     try{
       const [scope,config]=await Promise.all([api.json('/session'),api.json('/intake/config')]);
-      if(!config.enabled||!token) throw Error('需要现有 Drive 令牌及已配置文件夹');
+      if(!config.enabled||!token) throw Error('请先连接 Google Drive 或提供现有应用令牌');
+      if(manual||authorizedFolder!==config.folder){
+        const state=await driveFolderState(config.folder,token);
+        if(current!==generation)return;
+        if(state!=='ready')throw Error(state==='expired'?'Google 授权已过期，请重试。':'当前 Google 授权无法写入配置的目录。');
+      }
       const files=Array.from($('upload-files').files);
       if(!files.length||files.length>30) throw Error('每批请选择 1 至 30 个文件');
       $('upload-results').replaceChildren();
       for(const file of files){
+        if(current!==generation)break;
         const row=el('li',{text:file.name+' · 等待上传'});
         $('upload-results').append(row);
         const status=value=>{row.textContent=file.name+' · '+value;};
@@ -50,7 +124,7 @@ export function wireIntelligence({ api, actions }) {
         }catch(error){status('失败，可重新选取同一文件重试 · '+error.message);}
       }
     }catch(error){$('upload-config').textContent=error.message;}
-    finally{button.disabled=false;$('drive-token').value='';}
+    finally{if(current===generation){button.disabled=false;$('drive-token').value='';}}
   };
   async function showAnalysis(id){
     const node=$('upload-analysis');
@@ -81,4 +155,5 @@ export function wireIntelligence({ api, actions }) {
       if(!result.items.length)list.textContent='没有符合条件的素材。';
     }catch(error){list.textContent=error.message;}
   };
+  return {clear};
 }

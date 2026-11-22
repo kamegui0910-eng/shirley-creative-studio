@@ -460,3 +460,48 @@ test('accessibility basics: named controls, live regions, focus-visible dialogs'
     }
   });
 });
+
+test('Drive login uses the sandbox Picker and rechecks the folder grant', { skip }, async () => {
+  await withContext(async context => {
+    const page = await open({ context });
+    const folder='sandbox-test-folder';
+    const token='test-google-browser-token';
+    let granted=false,attempts=0;
+    await page.route('**/intake/config',route=>route.fulfill({json:{
+      enabled:true,folder,oauth:{clientId:'test.apps.googleusercontent.com',picker:{key:'test-picker-key',appId:'123456'}}
+    }}));
+    await page.route('https://accounts.google.com/gsi/client',route=>route.fulfill({
+      contentType:'text/javascript',body:`globalThis.google={accounts:{oauth2:{hasGrantedAllScopes:()=>true,
+        initTokenClient(config){return {requestAccessToken(){config.callback({access_token:'${token}',expires_in:3600,scope:config.scope});}}}
+      }}};`
+    }));
+    await page.route('https://apis.google.com/js/api.js',route=>route.fulfill({
+      contentType:'text/javascript',body:`globalThis.gapi={load(name,options){options.callback();}};
+      const register=()=>{if(!globalThis.google){setTimeout(register,5);return;}
+       class DocsView{setIncludeFolders(){return this;}setSelectFolderEnabled(){return this;}setMimeTypes(){return this;}}
+       class PickerBuilder{addView(){return this;}setDeveloperKey(){return this;}setAppId(){return this;}setOAuthToken(){return this;}setOrigin(){return this;}
+        setCallback(callback){this.callback=callback;return this;}
+        build(){return {setVisible:()=>this.callback({action:'picked',docs:[{id:'${folder}'}]})};}}
+       globalThis.google.picker={DocsView,PickerBuilder,ViewId:{FOLDERS:'folders'},Response:{ACTION:'action',DOCUMENTS:'docs'},Action:{PICKED:'picked'},Document:{ID:'id'}};
+      };register();`
+    }));
+    await page.route('https://www.googleapis.com/drive/v3/files/'+folder+'?*',async route=>{
+      const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Headers':'authorization','Access-Control-Allow-Methods':'GET, OPTIONS'};
+      if(route.request().method()==='OPTIONS'){await route.fulfill({status:204,headers});return;}
+      attempts++;
+      assert.equal(route.request().headers().authorization,'Bearer '+token);
+      if(!granted){await route.fulfill({status:404,headers,body:'{}'});return;}
+      await route.fulfill({headers,json:{id:folder,mimeType:'application/vnd.google-apps.folder',capabilities:{canAddChildren:true}}});
+    });
+    await login(page);
+    await page.click('#intelligence-open');
+    await page.click('#drive-connect');
+    await page.locator('#drive-picker').waitFor();
+    granted=true;
+    await page.click('#drive-picker');
+    await page.getByText('Google Drive 已连接，可以上传。').waitFor();
+    assert.equal(attempts,2);
+    assert.equal(await page.locator('#intelligence-dialog').isVisible(),true);
+    assert.equal(await page.locator('#drive-token').inputValue(),'');
+  });
+});

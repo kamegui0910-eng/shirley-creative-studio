@@ -1671,6 +1671,33 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "oauth": {
+                      "type": "object",
+                      "description": "Present for the configured upload operator only. Contains public settings for the existing Google web client.",
+                      "required": [
+                        "clientId"
+                      ],
+                      "properties": {
+                        "clientId": {
+                          "type": "string"
+                        },
+                        "picker": {
+                          "type": "object",
+                          "required": [
+                            "key",
+                            "appId"
+                          ],
+                          "properties": {
+                            "key": {
+                              "type": "string"
+                            },
+                            "appId": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
                     }
                   },
                   "required": [

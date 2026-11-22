@@ -151,7 +151,11 @@
   <form id="intake-form">
     <h3>批量上传到 Drive</h3>
     <p id="upload-config" role="status"></p>
-    <label>已有 Drive 访问令牌<input id="drive-token" type="password" autocomplete="off"></label>
+    <button id="drive-connect" type="button" hidden>连接 Google Drive</button>
+    <button id="drive-picker" type="button" hidden>选择私有测试目录</button>
+    <details><summary>已有应用令牌</summary>
+      <label>Drive 访问令牌<input id="drive-token" type="password" autocomplete="off"></label>
+    </details>
     <label>选取图片<input id="upload-files" type="file" accept="image/png,image/jpeg,image/webp" multiple required></label>
     <button id="upload-submit" type="submit" disabled>上传并分析</button>
   </form>

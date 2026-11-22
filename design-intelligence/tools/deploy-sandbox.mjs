@@ -35,11 +35,12 @@ if (process.argv[2] === 'import') {
   console.log(JSON.stringify({ batches, changes }));
 } else if (process.argv[2] === 'deploy') {
   const bindings = [{ type: 'd1', name: 'DB', id: dbId }, { type: 'plain_text', name: 'DESIGN_D1_CACHE', text: 'enabled' }];
-  for (const name of ['DESIGN_UPLOAD_FOLDER','DESIGN_UPLOAD_BRAND']) {
+  for (const name of ['DESIGN_UPLOAD_FOLDER','DESIGN_UPLOAD_BRAND','DESIGN_DRIVE_CLIENT_ID','DESIGN_DRIVE_PICKER_KEY','DESIGN_DRIVE_APP_ID']) {
     const prior=settings.bindings.find(binding=>binding.name===name&&binding.type==='plain_text');
     const value=process.env[name]??prior?.text;
     if (value) {
-      if (!/^[a-zA-Z0-9_-]{1,160}$/.test(value)) throw Error('Invalid upload binding');
+      const pattern=name==='DESIGN_DRIVE_CLIENT_ID'?/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/:/^[A-Za-z0-9_-]{1,160}$/;
+      if(!pattern.test(value)) throw Error('Invalid upload binding');
       bindings.push({type:'plain_text',name,text:value});
     }
   }

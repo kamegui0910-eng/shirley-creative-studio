@@ -75,7 +75,15 @@ export async function intelligence(request, env, url, scope, {select,one,all,jso
   };
   if (request.method==='GET') {
     if(path==='/design-dna') return json({global:DEFAULT_DNA,effective:await dna()});
-    if(path==='/intake/config') return json({enabled:scope.write===true&&Boolean(configuredFolder),folder:scope.write===true?configuredFolder??null:null});
+    if(path==='/intake/config'){
+      const enabled=scope.write===true&&Boolean(configuredFolder);
+      const clientId=env.DESIGN_DRIVE_CLIENT_ID;
+      const picker=[env.DESIGN_DRIVE_PICKER_KEY,env.DESIGN_DRIVE_APP_ID];
+      const validPicker=/^[A-Za-z0-9_-]{20,120}$/.test(picker[0]??'')&&/^\d{5,24}$/.test(picker[1]??'');
+      const oauth=enabled&&/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(clientId??'')
+        ?{clientId,...(validPicker?{picker:{key:picker[0],appId:picker[1]}}:{})}:null;
+      return json({enabled,folder:enabled?configuredFolder:null,...(oauth?{oauth}:{})});
+    }
     if(path==='/intake/dedupe'){
       const hash=url.searchParams.get('fingerprint')??'';
       if(!fingerprintPattern.test(hash)) return failure('Invalid fingerprint',400);

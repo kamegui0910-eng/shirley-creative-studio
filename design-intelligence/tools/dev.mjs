@@ -44,13 +44,15 @@ if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pat
   const assets = localCache('public');
   const types = { html: 'text/html', mjs: 'text/javascript', css: 'text/css' };
   const env = {
+    DESIGN_DRIVE_CLIENT_ID:process.env.DESIGN_DRIVE_CLIENT_ID, DESIGN_DRIVE_PICKER_KEY:process.env.DESIGN_DRIVE_PICKER_KEY, DESIGN_DRIVE_APP_ID:process.env.DESIGN_DRIVE_APP_ID,
     DB: sqliteBinding(db), DESIGN_UPLOAD_FOLDER: process.env.DESIGN_UPLOAD_FOLDER, DESIGN_UPLOAD_BRAND: process.env.DESIGN_UPLOAD_BRAND, CACHE: localCache(process.env.DESIGN_DEV_CACHE ?? (demo ? '.local/demo/cache' : '.local/cache')),
     DESIGN_PRINCIPALS: JSON.stringify({ [await tokenDigest(token)]: { tenantId: 'studio', brandId: 'shirley', write: true } }),
     STATIC: { async fetch(request) {
       const name = new URL(request.url).pathname.slice(1) || 'index.html';
       const file = await assets.get(name);
       return file ? new Response(file.body, { headers: { 'Content-Type': types[name.split('.').at(-1)],
-        'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://www.googleapis.com; img-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" } }) : new Response(null, { status: 404 });
+        'Referrer-Policy':'strict-origin-when-cross-origin', 'Cross-Origin-Opener-Policy':'same-origin-allow-popups',
+        'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://apis.google.com https://docs.google.com; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com; frame-src https://accounts.google.com https://docs.google.com https://drive.google.com; style-src 'self' https://accounts.google.com/gsi/style; img-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" } }) : new Response(null, { status: 404 });
     } }
   };
   createServer(async (req, res) => {

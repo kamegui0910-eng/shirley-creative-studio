@@ -12,6 +12,7 @@ import { emptyRecipe, createHistory, fingerprint } from './ui/recipe.mjs';
 const TOKEN_KEY = 'shirley-di:session-token';
 let token = '';
 let started = false;
+let intake;
 
 const feedback = createFeedback();
 const storage = createStorage();
@@ -58,6 +59,7 @@ async function logout(message = '', { force = false } = {}) {
   token = '';
   try { sessionStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ }
   assets.clear();
+  intake?.clear();
   store.set({ styles: [] });
   showLogin(message);
 }
@@ -72,7 +74,7 @@ async function start() {
     library.init();
     editor.init();
     themePanel.init();
-    wireIntelligence({api,actions});
+    intake=wireIntelligence({api,actions});
     $('logout').onclick = () => logout();
     document.querySelectorAll('#tabs [data-tab]').forEach(button => { button.onclick = () => showTab(button.dataset.tab); });
     addEventListener('offline', () => { $('conn').textContent = '离线'; $('conn').hidden = false; });
