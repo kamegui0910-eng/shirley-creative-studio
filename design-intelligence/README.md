@@ -33,11 +33,6 @@ Asset identity is derived from the Drive ID. Original index rows and Catalog row
 
 ### Cloudflare sandbox
 
-The committed configuration uses a placeholder D1 ID for local development. In an authorized sandbox, replace it with the sandbox D1 ID and supply a private R2 bucket binding named `CACHE`. The Node development server provides a filesystem compatible binding when R2 is unavailable. A deployed Worker needs a populated cache binding for the two image endpoints. Store `DESIGN_PRINCIPALS` as a Worker secret, a JSON object mapping SHA-256 hashes of securely generated bearer tokens to `{tenantId,brandId,write}`. The API only takes scope from this mapping. Use a unique token per client and brand.
+See the [live sandbox and deployment runbook](docs/cloud-test.md) for the D1 preview fallback, isolated migration and rollback, and cloud smoke tests. Supply a private R2 bucket as `CACHE` when available. Configure [Agent access](docs/agent-setup.md) with independently issued brand-scoped read-only credentials.
 
-1. Apply `migrations/0001_index.sql` to a new sandbox D1 with Wrangler.
-2. Run `node tools/export-d1.mjs` and import the generated `.local/seed.sql`. The export seeds an empty D1 and is repeat-safe for identical input. Use a reviewed update migration for subsequent changes to an existing live index.
-3. Upload `.local/cache` to the private bucket preserving relative paths, then deploy the Worker with its static asset directory. Keep source data and derived assets out of the public asset directory.
-4. Verify the six required endpoints, private cache fetches and recipe save/recovery with sandbox credentials. `rollback/0001_index.sql` removes the Phase 1 schema. For a sandbox containing saved recipes, back up before applying this down migration. Wrangler migration history is separate, so reapply the schema explicitly or recreate the disposable sandbox for rollback testing.
-
-The portable [Design Skill](skills/design-intelligence/SKILL.md) documents paginated REST access and the existing Gateway handoff. [OpenAPI](openapi.json) is the contract for other clients and future MCP tools.
+The portable [Design Skill](skills/design-intelligence/SKILL.md) documents paginated REST access. [OpenAPI](openapi.json) is the contract for other clients and future MCP tools.

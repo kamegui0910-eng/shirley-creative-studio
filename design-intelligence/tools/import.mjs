@@ -5,7 +5,7 @@ import { join, basename, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const migration = new URL('../migrations/0001_index.sql', import.meta.url);
+const migrations = ['0001_index.sql', '0002_preview_cache.sql'];
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const assetId = id => 'a_' + hash(id).slice(0, 32);
 const slug = value => /^[a-z][a-z0-9-]*$/.test(value) ? value : 't-' + hash(value).slice(0, 16);
@@ -14,15 +14,18 @@ const folders = { icons: 'icons 交互图标', frames: 'frames 边框面板', st
 
 export function openIndex(path) {
   const db = new DatabaseSync(path);
-  if (!db.prepare("SELECT 1 FROM sqlite_schema WHERE name='brands'").get()) {
-    db.exec('BEGIN');
-    try {
-      db.exec(readFileSync(migration, 'utf8'));
-      db.exec('COMMIT');
-    } catch (error) {
-      db.exec('ROLLBACK');
-      throw error;
+  const tables = ['brands', 'preview_cache'];
+  db.exec('BEGIN');
+  try {
+    for (const [index, migration] of migrations.entries()) {
+      const exists = db.prepare("SELECT 1 FROM sqlite_schema WHERE type='table' AND name=?").get(tables[index]);
+      if (!exists) db.exec(readFileSync(new URL('../migrations/' + migration, import.meta.url), 'utf8'));
     }
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    db.close();
+    throw error;
   }
   return db;
 }

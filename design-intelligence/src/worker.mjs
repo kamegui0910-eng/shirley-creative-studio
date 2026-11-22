@@ -51,6 +51,7 @@ async function route(request, env, url, scope) {
     return failure('Scope forbidden', 403);
   }
   if (request.method === 'GET') {
+    if (path === '/session') return json({ tenantId, brandId, write: scope.write === true });
     if (path === '/styles') {
       const rows = await all('SELECT DISTINCT s.id,s.label,p.colors,p.tokens,p.token_compatibility FROM styles s JOIN asset_tags t ON t.style_id=s.id LEFT JOIN palettes p ON p.style_id=s.id AND p.tenant_id=t.tenant_id AND p.brand_id=t.brand_id WHERE t.tenant_id=? AND t.brand_id=? ORDER BY s.label', ...keys);
       return json({ items: rows.map(row => ({ id: row.id, label: row.label, colors: JSON.parse(row.colors), tokens: JSON.parse(row.tokens), tokenCompatibility: JSON.parse(row.token_compatibility) })) });
@@ -91,9 +92,15 @@ async function route(request, env, url, scope) {
       if (!record) return failure('Asset not found', 404);
       if (variant) {
         const row = await one('SELECT cache_key,mime_type FROM asset_variants WHERE ' + where + ' AND asset_id=? AND kind=?', ...keys, id, variant);
-        const object = row?.cache_key && env.CACHE && await env.CACHE.get(row.cache_key);
-        if (!object) return failure('Preview unavailable', 404);
-        return new Response(object.body, { headers: {
+        if (!row?.cache_key) return failure('Preview unavailable', 404);
+        const object = env.CACHE && await env.CACHE.get(row.cache_key);
+        let body = object?.body;
+        if (!body && env.DESIGN_D1_CACHE === 'enabled') {
+          const cached = await one('SELECT content_base64 FROM preview_cache WHERE ' + where + ' AND cache_key=?', ...keys, row.cache_key);
+          if (cached) body = Uint8Array.from(atob(cached.content_base64), character => character.charCodeAt(0));
+        }
+        if (!body) return failure('Preview unavailable', 404);
+        return new Response(body, { headers: {
           'Content-Type': row.mime_type, 'Cache-Control': 'private, no-store',
           'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'"
         } });
