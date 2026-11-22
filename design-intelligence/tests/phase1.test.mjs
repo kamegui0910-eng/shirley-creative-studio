@@ -88,6 +88,7 @@ test('Migration rollback and reapply preserve unrelated tables', () => {
   const scratch = openIndex(':memory:');
   scratch.exec('CREATE TABLE unrelated (id INTEGER); INSERT INTO unrelated VALUES (1)');
   const readSQL = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+  scratch.exec(readSQL('../rollback/0004_intelligence.sql'));
   scratch.exec(readSQL('../rollback/0003_recipe_search.sql'));
   scratch.exec(readSQL('../rollback/0002_preview_cache.sql'));
   scratch.exec(readSQL('../rollback/0001_index.sql'));
@@ -95,6 +96,7 @@ test('Migration rollback and reapply preserve unrelated tables', () => {
   scratch.exec(readSQL('../migrations/0001_index.sql'));
   scratch.exec(readSQL('../migrations/0002_preview_cache.sql'));
   scratch.exec(readSQL('../migrations/0003_recipe_search.sql'));
+  scratch.exec(readSQL('../migrations/0004_intelligence.sql'));
   assert.equal(scratch.prepare('SELECT id FROM unrelated').get().id, 1);
   assert.deepEqual(scratch.prepare('PRAGMA foreign_key_check').all(), []);
   scratch.close();

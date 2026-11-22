@@ -8,10 +8,14 @@ import { openIndex } from './import.mjs';
 import worker, { tokenDigest } from '../src/worker.mjs';
 
 export function sqliteBinding(db) {
-  return { prepare(sql) {
+  return { async batch(statements) {
+    db.exec('BEGIN');
+    try { const rows=await Promise.all(statements.map(statement=>statement.run()));db.exec('COMMIT');return rows;}
+    catch(error){db.exec('ROLLBACK');throw error;}
+  },prepare(sql) {
     return { bind(...args) {
       const statement = db.prepare(sql);
-      return { all: async () => ({ results: statement.all(...args) }), first: async () => statement.get(...args) ?? null };
+      return { all: async () => ({ results: statement.all(...args) }), first: async () => statement.get(...args) ?? null, run:async()=>statement.run(...args) };
     } };
   } };
 }
@@ -40,13 +44,13 @@ if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pat
   const assets = localCache('public');
   const types = { html: 'text/html', mjs: 'text/javascript', css: 'text/css' };
   const env = {
-    DB: sqliteBinding(db), CACHE: localCache(process.env.DESIGN_DEV_CACHE ?? (demo ? '.local/demo/cache' : '.local/cache')),
+    DB: sqliteBinding(db), DESIGN_UPLOAD_FOLDER: process.env.DESIGN_UPLOAD_FOLDER, DESIGN_UPLOAD_BRAND: process.env.DESIGN_UPLOAD_BRAND, CACHE: localCache(process.env.DESIGN_DEV_CACHE ?? (demo ? '.local/demo/cache' : '.local/cache')),
     DESIGN_PRINCIPALS: JSON.stringify({ [await tokenDigest(token)]: { tenantId: 'studio', brandId: 'shirley', write: true } }),
     STATIC: { async fetch(request) {
       const name = new URL(request.url).pathname.slice(1) || 'index.html';
       const file = await assets.get(name);
       return file ? new Response(file.body, { headers: { 'Content-Type': types[name.split('.').at(-1)],
-        'Content-Security-Policy': "default-src 'self'; img-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" } }) : new Response(null, { status: 404 });
+        'Content-Security-Policy': "default-src 'self'; connect-src 'self' https://www.googleapis.com; img-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'" } }) : new Response(null, { status: 404 });
     } }
   };
   createServer(async (req, res) => {

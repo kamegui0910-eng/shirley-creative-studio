@@ -38,6 +38,7 @@
 
   <div id="app" hidden>
     <section id="panel-library" class="panel" data-panel="library" aria-labelledby="h-lib">
+      <button type="button" id="intelligence-open">上传与相似检索</button>
       <h2 id="h-lib">素材库</h2>
       <div class="filters">
         <label>风格<select id="style"></select></label>
@@ -144,6 +145,26 @@
 </dialog>
 
 <div id="toast" role="status" aria-live="polite" hidden></div>
+<dialog id="intelligence-dialog" aria-labelledby="intelligence-title">
+  <h2 id="intelligence-title">素材入口</h2>
+  <button type="button" id="intelligence-close">关闭</button>
+  <form id="intake-form">
+    <h3>批量上传到 Drive</h3>
+    <p id="upload-config" role="status"></p>
+    <label>已有 Drive 访问令牌<input id="drive-token" type="password" autocomplete="off"></label>
+    <label>选取图片<input id="upload-files" type="file" accept="image/png,image/jpeg,image/webp" multiple required></label>
+    <button id="upload-submit" type="submit" disabled>上传并分析</button>
+  </form>
+  <ul id="upload-results" aria-live="polite"></ul>
+  <form id="recommend-form">
+    <h3>素材检索</h3>
+    <label>关键词<input id="recommend-text" maxlength="160"></label>
+    <label>参考图<input id="recommend-image" type="file" accept="image/png,image/jpeg,image/webp"></label>
+    <button type="submit">检索</button>
+  </form>
+  <ol id="recommend-results" aria-live="polite"></ol>
+  <div id="upload-analysis" role="status"></div>
+</dialog>
 <script type="module" src="/app.mjs"></script>
 </body>
 </html>

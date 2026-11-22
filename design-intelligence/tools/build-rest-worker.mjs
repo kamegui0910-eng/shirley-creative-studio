@@ -19,7 +19,10 @@ const headers = Object.fromEntries(read('public/_headers').split('\n').filter(li
   return [line.slice(2, separator), line.slice(separator + 1).trim()];
 }));
 const recipe = read('src/recipe.mjs').replaceAll(/^export /gm, '');
-const source = read('src/worker.mjs').replace("import { recipeDocument, validId } from './recipe.mjs';", recipe);
+const model = read('public/ui/visual-features.mjs').match(/^export const MODEL = .*;$/m)[0].replace('export ', '');
+const extension = read('src/intelligence.mjs').replace(/^import .*\n/m, '').replaceAll(/^export /gm, '');
+const source = read('src/worker.mjs').replace("import { recipeDocument, validId } from './recipe.mjs';", recipe)
+  .replace("import { intelligence } from './intelligence.mjs';", model + '\n' + extension);
 const moduleText = source.replace('export default {', 'const application = {') + `
 const shellFiles = ${JSON.stringify(files)};
 const shellHeaders = ${JSON.stringify(headers)};

@@ -1,4 +1,5 @@
 import { recipeDocument, validId } from './recipe.mjs';
+import { intelligence } from './intelligence.mjs';
 
 const rights = ['reference_only', 'unverified', 'restricted', 'commercial_ready'];
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -56,6 +57,8 @@ async function route(request, env, url, scope) {
   if (params.has('tenantId') && params.get('tenantId') !== tenantId || params.has('brandId') && params.get('brandId') !== brandId) {
     return failure('Scope forbidden', 403);
   }
+  const extension = await intelligence(request, env, url, scope, {select,one,all,json,failure,boundedJSON});
+  if (extension) return extension;
   if (request.method === 'GET') {
     if (path === '/session') return json({ tenantId, brandId, write: scope.write === true });
     if (path === '/styles') {

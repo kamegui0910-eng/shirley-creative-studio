@@ -18,3 +18,11 @@ Use the existing Gateway's reviewed task intake for Grok and Muse. Include only 
 Use `openapi.json` as the tool schema source. A future MCP adapter should call the existing scoped REST operations and preserve the same credential boundary and pagination. Shared Skill installation and live agent credentials are managed by each host.
 
 Use the [Agent setup guide](../../docs/agent-setup.md) for test credentials, the Gateway collaboration reference and the reviewed fallback packet.
+
+## Reuse-first intake and retrieval
+
+- Use `POST /assets/recommend` for a scoped ranked shortlist. Pass `q`, optional `visual` from the local `pixels-v1` extractor, and `purpose`. Inspect the returned contribution signals before reusing a result.
+- Read `GET /assets/{id}/analysis` for measured palette, layout geometry and provenance-aware versioning. Raster typography and automatic semantic components remain unverified. Request human verification instead of inventing labels.
+- Read `GET /design-dna` for defaults and current brand rules. A brand write credential may set an override. Never promote rights from visual analysis.
+- Add assets through the official Drive intake path in a configured private folder. Upload receipts authorize indexing only. Use the existing Recipe editor and keep marketing renders private unless the brand explicitly authorizes a connected publication flow.
+- See [status and rollback](../../docs/reuse-first-status.md) and the [Skill Registry](../../docs/skill-registry.md) before re-evaluating external tools.

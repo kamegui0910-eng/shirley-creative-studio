@@ -142,3 +142,9 @@ dialog::backdrop{background:rgba(35,28,35,.5)}
   .top{padding:14px}
 }
 @media(pointer:coarse){button,select,input,input[type=color]{min-height:44px}button.small{min-height:40px}.chip{min-height:40px}}
+
+#intelligence-dialog { width:min(680px, calc(100% - 2rem)); max-height:85vh; overflow:auto; }
+#intelligence-dialog form { display:grid; gap:.55rem; margin-top:1rem; }
+#intelligence-dialog form button { justify-self:start; }
+.analysis-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.2rem; max-width:16rem; }
+.analysis-grid span { text-align:center; background:#faedf4; padding:.2rem; }

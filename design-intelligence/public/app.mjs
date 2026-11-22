@@ -6,6 +6,7 @@ import { createLibrary } from './ui/library.mjs';
 import { createDetail } from './ui/detail.mjs';
 import { createEditor } from './ui/editor.mjs';
 import { createThemePanel } from './ui/themepanel.mjs';
+import { wireIntelligence } from './ui/intake-panel.mjs';
 import { emptyRecipe, createHistory, fingerprint } from './ui/recipe.mjs';
 
 const TOKEN_KEY = 'shirley-di:session-token';
@@ -71,6 +72,7 @@ async function start() {
     library.init();
     editor.init();
     themePanel.init();
+    wireIntelligence({api,actions});
     $('logout').onclick = () => logout();
     document.querySelectorAll('#tabs [data-tab]').forEach(button => { button.onclick = () => showTab(button.dataset.tab); });
     addEventListener('offline', () => { $('conn').textContent = '离线'; $('conn').hidden = false; });
