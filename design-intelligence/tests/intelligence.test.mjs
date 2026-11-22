@@ -45,10 +45,11 @@ test('Verified Drive receipt, dedupe, versioned analysis, contextual search and 
     const body={driveFileId:'verified-file',fingerprint};
     const headers={'X-Drive-Access-Token':'testing-credential-for-google'};
     assert.equal((await get('/intake/register',{method:'POST',body,headers,token:other})).status,503);
-    const first=await get('/intake/register',{method:'POST',body,headers});
-    assert.equal(first.status,201);
+    const results=await Promise.all([1,2].map(()=>get('/intake/register',{method:'POST',body,headers})));
+    assert.deepEqual(results.map(response=>response.status).sort(),[200,201]);
+    const first=results.find(response=>response.status===201);
     const {assetId}=await first.json();
-    const duplicate=await get('/intake/register',{method:'POST',body,headers});
+    const duplicate=results.find(response=>response.status===200);
     assert.deepEqual(await duplicate.json(),{assetId,duplicate:true});
     assert.equal(db.prepare('SELECT count(*) n FROM assets').get().n,1);
     assert.equal((await get('/assets/'+assetId+'/analysis',{token:other})).status,404);

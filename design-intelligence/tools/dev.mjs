@@ -10,12 +10,12 @@ import worker, { tokenDigest } from '../src/worker.mjs';
 export function sqliteBinding(db) {
   return { async batch(statements) {
     db.exec('BEGIN');
-    try { const rows=await Promise.all(statements.map(statement=>statement.run()));db.exec('COMMIT');return rows;}
+    try { const rows=statements.map(statement=>statement.run());db.exec('COMMIT');return rows;}
     catch(error){db.exec('ROLLBACK');throw error;}
   },prepare(sql) {
     return { bind(...args) {
       const statement = db.prepare(sql);
-      return { all: async () => ({ results: statement.all(...args) }), first: async () => statement.get(...args) ?? null, run:async()=>statement.run(...args) };
+      return { all: async () => ({ results: statement.all(...args) }), first: async () => statement.get(...args) ?? null, run:()=>statement.run(...args) };
     } };
   } };
 }

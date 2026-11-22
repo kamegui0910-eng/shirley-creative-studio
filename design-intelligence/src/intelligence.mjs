@@ -52,7 +52,7 @@ export function rankVisual(row, query, dna=DEFAULT_DNA) {
   };
   const weights=normalized(Object.fromEntries(Object.entries(dna.weights).filter(([key])=>sources[key]!==null)));
   const scores=Object.fromEntries(Object.entries(weights).map(([key,w])=>[key,Number((w*sources[key]).toFixed(4))]));
-  return {assetId:row.asset_id,name:row.name,rights:row.rights,score:Number(Object.values(scores).reduce((a,b)=>a+b,0).toFixed(4)),signals:scores};
+  return {assetId:row.asset_id,name:row.name,rights:row.rights,score:Math.min(1,Number(Object.values(scores).reduce((a,b)=>a+b,0).toFixed(4))),signals:scores};
 }
 async function driveFile(fileId, accessToken, fetcher) {
   const url=new URL('https://www.googleapis.com/drive/v3/files/'+fileId);
@@ -145,9 +145,10 @@ export async function intelligence(request, env, url, scope, {select,one,all,jso
       select("INSERT INTO assets SELECT ?,?,?,?,?,'reference',?,'unverified','pending',NULL WHERE NOT EXISTS (SELECT 1 FROM drive_intake WHERE tenant_id=? AND brand_id=? AND fingerprint=?) ON CONFLICT DO NOTHING",...keys,id,file.id,file.name,String(file.version??'1'),...keys,fingerprint),
       select("INSERT INTO drive_intake VALUES (?,?,?,?) ON CONFLICT DO NOTHING",...keys,fingerprint,id)
     ];
-    await env.DB.batch(statements);
+    const [insert]=await env.DB.batch(statements);
     const saved=await one('SELECT asset_id AS assetId FROM drive_intake WHERE tenant_id=? AND brand_id=? AND fingerprint=?',...keys,fingerprint);
-    return json({...saved,duplicate:saved.assetId!==id},saved.assetId===id?201:200);
+    const created=Number(insert.meta?.changes??insert.changes??0)>0;
+    return json({...saved,duplicate:!created},created?201:200);
   }
   return failure('Method not allowed',405);
 }
