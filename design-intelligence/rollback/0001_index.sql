@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS design_recipes;
+DROP TABLE IF EXISTS classification_queue;
+DROP TABLE IF EXISTS sync_state;
+DROP TABLE IF EXISTS asset_lineage;
+DROP TABLE IF EXISTS asset_sources;
+DROP TABLE IF EXISTS components;
+DROP TABLE IF EXISTS palettes;
+DROP TABLE IF EXISTS asset_tags;
+DROP TABLE IF EXISTS categories;
+DROP TABLE IF EXISTS styles;
+DROP TABLE IF EXISTS asset_variants;
+DROP TABLE IF EXISTS assets;
+DROP TABLE IF EXISTS brands;
