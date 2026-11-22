@@ -27,11 +27,65 @@ async function boundedJSON(request) {
     const { done, value } = await reader.read();
     if (done) return JSON.parse(body + decoder.decode());
     size += value.byteLength;
-    if (size > 16384) {
+    if (size > 65536) {
       await reader.cancel();
       throw Error('Body too large');
     }
     body += decoder.decode(value, { stream: true });
+  }
+}
+
+// ---- Recipe document schema v2 (additive; v1 documents and v1 PUT bodies stay valid) ----
+// v2 adds canvas, layout mode, theme and an ordered layer list. `components` is derived from component
+// layers (unique assetIds, layer order) so v1 readers and publication-check keep working unchanged.
+const HEX = /^#[a-f0-9]{6}$/i;
+const finite = (value, min, max) => typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max;
+const plainText = (value, min, max) => typeof value === 'string' && value.length >= min && value.length <= max && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
+const colorMap = (value, keyPattern, max) => {
+  if (value === undefined) return {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('colors');
+  const entries = Object.entries(value);
+  if (entries.length > max) throw Error('colors');
+  for (const [key, color] of entries) if (!keyPattern.test(key) || !HEX.test(color)) throw Error('colors');
+  return Object.fromEntries(entries.map(([key, color]) => [key, color.toLowerCase()]));
+};
+export const RECIPE_LIMITS = { layers: 40, components: 12, texts: 12 };
+
+export function parseRecipeV2(body) {
+  try {
+    if (body.schemaVersion !== 2) throw Error('schemaVersion');
+    if (!plainText(body.title, 1, 120) || !validId(body.style) || !HEX.test(body.accent)) throw Error('header');
+    const canvas = body.canvas;
+    if (!canvas || !Number.isInteger(canvas.width) || !Number.isInteger(canvas.height) || canvas.width < 64 || canvas.width > 4096 ||
+        canvas.height < 64 || canvas.height > 4096 || !(canvas.background === null || HEX.test(canvas.background))) throw Error('canvas');
+    if (!['grid', 'free'].includes(body.layout)) throw Error('layout');
+    const theme = { colors: colorMap(body.theme?.colors, /^[\w-]{1,40}$/, 32), tokens: colorMap(body.theme?.tokens, /^--[\w-]{1,60}$/, 64) };
+    if (!Array.isArray(body.layers) || body.layers.length < 1 || body.layers.length > RECIPE_LIMITS.layers) throw Error('layers');
+    const ids = new Set();
+    const counts = { component: 0, text: 0 };
+    const layers = body.layers.map(layer => {
+      if (!layer || typeof layer !== 'object' || !validId(layer.id) || layer.id.length > 40 || ids.has(layer.id)) throw Error('layer');
+      ids.add(layer.id);
+      if (!Object.hasOwn(counts, layer.type)) throw Error('layer type');
+      counts[layer.type]++;
+      if (!finite(layer.x, -8192, 8192) || !finite(layer.y, -8192, 8192) || !finite(layer.scale, 0.05, 20) ||
+          !finite(layer.rotation, -360, 360) || !finite(layer.opacity, 0, 1) || typeof layer.visible !== 'boolean' || typeof layer.locked !== 'boolean') throw Error('transform');
+      if (layer.name !== undefined && !plainText(layer.name, 0, 120)) throw Error('name');
+      const common = { id: layer.id, type: layer.type, x: layer.x, y: layer.y, scale: layer.scale, rotation: layer.rotation, opacity: layer.opacity, visible: layer.visible, locked: layer.locked };
+      if (layer.name) common.name = layer.name;
+      if (layer.type === 'component') {
+        if (!validId(layer.assetId) || !finite(layer.w, 1, 8192) || !finite(layer.h, 1, 8192)) throw Error('component');
+        return { ...common, assetId: layer.assetId, w: layer.w, h: layer.h, colors: colorMap(layer.colors, /^[\w-]{1,40}$/, 16) };
+      }
+      if (!plainText(layer.text, 1, 500) || !finite(layer.fontSize, 8, 400) || !HEX.test(layer.color) ||
+          !['normal', 'bold'].includes(layer.weight) || !['left', 'center', 'right'].includes(layer.align)) throw Error('text');
+      return { ...common, text: layer.text, fontSize: layer.fontSize, color: layer.color.toLowerCase(), weight: layer.weight, align: layer.align };
+    });
+    if (counts.component > RECIPE_LIMITS.components || counts.text > RECIPE_LIMITS.texts) throw Error('limits');
+    const components = [...new Set(layers.filter(layer => layer.type === 'component').map(layer => layer.assetId))].map(assetId => ({ assetId }));
+    return { document: { schemaVersion: 2, title: body.title, style: body.style, accent: body.accent.toLowerCase(), canvas: { width: canvas.width, height: canvas.height, background: canvas.background === null ? null : canvas.background.toLowerCase() }, layout: body.layout, theme, layers, components } };
+  } catch (error) {
+    return { error: error.message };
   }
 }
 
@@ -120,13 +174,24 @@ async function route(request, env, url, scope) {
     }
   }
 
-  const recipe = path.match(/^\/design-recipes\/([\w-]{1,100})(\/publication-check)?$/);
+  const recipe = path.match(/^\/design-recipes\/([\w-]{1,100})(\/publication-check|\/revisions(?:\/(\d{1,9}))?)?$/);
   if (!recipe) return failure('Route not found', 404);
-  const [, id, publication] = recipe;
+  const [, id, suffix, revision] = recipe;
+  const publication = suffix === '/publication-check';
+  const revisions = suffix?.startsWith('/revisions');
+  if (revisions && env.DESIGN_REVISIONS !== 'enabled') return failure('Route not found', 404);
   const readRecipe = () => one('SELECT * FROM design_recipes WHERE ' + where + ' AND id=?', ...keys, id);
   if (request.method === 'GET') {
     const row = await readRecipe();
     if (!row) return failure('Recipe not found', 404);
+    if (revisions) {
+      if (revision === undefined) {
+        const rows = await all('SELECT version,updated_at,json_extract(document,\'$.title\') AS title FROM design_recipe_revisions WHERE ' + where + ' AND id=? ORDER BY version DESC LIMIT 50', ...keys, id);
+        return json({ items: rows.map(item => ({ version: item.version, updatedAt: item.updated_at, title: item.title })) });
+      }
+      const old = await one('SELECT * FROM design_recipe_revisions WHERE ' + where + ' AND id=? AND version=?', ...keys, id, Number(revision));
+      return old ? json(recipeView(old)) : failure('Revision not found', 404);
+    }
     const result = recipeView(row);
     if (!publication) return json(result);
     const blockers = [];
@@ -136,25 +201,41 @@ async function route(request, env, url, scope) {
     }
     return json({ allowed: blockers.length === 0, blockers });
   }
-  if (request.method !== 'PUT' || publication) return failure('Method not allowed', 405);
+  if (request.method !== 'PUT' || suffix) return failure('Method not allowed', 405);
   if (scope.write !== true) return failure('Write forbidden', 403);
   let body;
   try { body = await boundedJSON(request); } catch { return failure('Invalid recipe body', 400); }
-  if (!body || !Number.isSafeInteger(body.version) || body.version < 0 || typeof body.title !== 'string' ||
-      body.title.length < 1 || body.title.length > 120 || !validId(body.style) || !Array.isArray(body.components) ||
-      body.components.length < 1 || body.components.length > 12 || !/^#[a-f0-9]{6}$/i.test(body.accent)) return failure('Invalid recipe', 400);
-  const components = [];
-  for (const item of body.components) {
-    if (!validId(item?.assetId)) return failure('Invalid component', 400);
-    const row = await one('SELECT 1 FROM components WHERE ' + where + ' AND asset_id=? AND style_id=?', ...keys, item.assetId, body.style);
-    if (!row) return failure('Component not found in style', 404);
-    components.push({ assetId: item.assetId });
+  if (!body || typeof body !== 'object' || !Number.isSafeInteger(body.version) || body.version < 0) return failure('Invalid recipe', 400);
+  let document;
+  if (body.schemaVersion === undefined) {
+    if (typeof body.title !== 'string' ||
+        body.title.length < 1 || body.title.length > 120 || !validId(body.style) || !Array.isArray(body.components) ||
+        body.components.length < 1 || body.components.length > 12 || !/^#[a-f0-9]{6}$/i.test(body.accent)) return failure('Invalid recipe', 400);
+    const components = [];
+    for (const item of body.components) {
+      if (!validId(item?.assetId)) return failure('Invalid component', 400);
+      const row = await one('SELECT 1 FROM components WHERE ' + where + ' AND asset_id=? AND style_id=?', ...keys, item.assetId, body.style);
+      if (!row) return failure('Component not found in style', 404);
+      components.push({ assetId: item.assetId });
+    }
+    document = JSON.stringify({ title: body.title, style: body.style, accent: body.accent, components });
+  } else {
+    const parsed = parseRecipeV2(body);
+    if (parsed.error) return failure('Invalid recipe', 400);
+    for (const item of parsed.document.components) {
+      const row = await one('SELECT 1 FROM components WHERE ' + where + ' AND asset_id=? AND style_id=?', ...keys, item.assetId, body.style);
+      if (!row) return failure('Component not found in style', 404);
+    }
+    document = JSON.stringify(parsed.document);
   }
-  const document = JSON.stringify({ title: body.title, style: body.style, accent: body.accent, components });
   const now = new Date().toISOString();
   const saved = body.version === 0
     ? await one('INSERT INTO design_recipes VALUES (?,?,?,1,?,?) ON CONFLICT DO NOTHING RETURNING *', ...keys, id, document, now)
     : await one('UPDATE design_recipes SET version=version+1,document=?,updated_at=? WHERE ' + where + ' AND id=? AND version=? RETURNING *', document, now, ...keys, id, body.version);
+  if (saved && env.DESIGN_REVISIONS === 'enabled') {
+    try { await select('INSERT OR IGNORE INTO design_recipe_revisions VALUES (?,?,?,?,?,?)', ...keys, id, saved.version, saved.document, saved.updated_at).run(); }
+    catch { console.error({ event: 'design_revision_error' }); }
+  }
   return saved ? json(recipeView(saved), body.version === 0 ? 201 : 200) : failure('Recipe version conflict', 409);
 }
 

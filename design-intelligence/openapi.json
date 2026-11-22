@@ -685,11 +685,18 @@
         },
         "requestBody": {
           "required": true,
-          "description": "Use version 0 to create and the last read version to update.",
+          "description": "Use version 0 to create and the last read version to update. Send either the v1 body or the v2 body (`schemaVersion: 2`). A client MUST check that the response document has `schemaVersion: 2` before treating a v2 save as complete: an older Worker silently stores only the v1 fields.",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RecipeInput"
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RecipeInput"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RecipeInputV2"
+                  }
+                ]
               }
             }
           }
@@ -907,6 +914,123 @@
           },
           "404": {
             "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}/revisions": {
+      "get": {
+        "operationId": "listRecipeRevisions",
+        "description": "Only when the Worker has DESIGN_REVISIONS=enabled (and migration 0003 applied); otherwise 404. Newest first, at most 50.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RecipeRevisionSummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Recipe not found or revisions disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}/revisions/{version}": {
+      "get": {
+        "operationId": "getRecipeRevision",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1245,44 +1369,51 @@
             "format": "date-time"
           },
           "document": {
-            "type": "object",
-            "properties": {
-              "title": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 120
-              },
-              "style": {
-                "type": "string",
-                "pattern": "^[a-zA-Z0-9_-]{1,100}$"
-              },
-              "accent": {
-                "type": "string",
-                "pattern": "^#[a-fA-F0-9]{6}$"
-              },
-              "components": {
-                "type": "array",
-                "minItems": 1,
-                "maxItems": 12,
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "assetId": {
-                      "type": "string",
-                      "pattern": "^[a-zA-Z0-9_-]{1,100}$"
-                    }
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
                   },
-                  "required": [
-                    "assetId"
-                  ]
-                }
+                  "style": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                  },
+                  "accent": {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  "components": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 12,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "assetId": {
+                          "type": "string",
+                          "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                        }
+                      },
+                      "required": [
+                        "assetId"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "title",
+                  "style",
+                  "accent",
+                  "components"
+                ]
+              },
+              {
+                "$ref": "#/components/schemas/RecipeDocumentV2"
               }
-            },
-            "required": [
-              "title",
-              "style",
-              "accent",
-              "components"
             ]
           }
         },
@@ -1291,6 +1422,443 @@
           "version",
           "updatedAt",
           "document"
+        ]
+      },
+      "RecipeLayer": {
+        "description": "Layer order is z-order (later = on top). Component x/y/w/h are the layer center and base box in canvas units; with layout=grid the client recomputes them.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[\\w-]{1,40}$"
+              },
+              "x": {
+                "type": "number",
+                "minimum": -8192,
+                "maximum": 8192
+              },
+              "y": {
+                "type": "number",
+                "minimum": -8192,
+                "maximum": 8192
+              },
+              "scale": {
+                "type": "number",
+                "minimum": 0.05,
+                "maximum": 20
+              },
+              "rotation": {
+                "type": "number",
+                "minimum": -360,
+                "maximum": 360
+              },
+              "opacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "visible": {
+                "type": "boolean"
+              },
+              "locked": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "type": {
+                "const": "component"
+              },
+              "assetId": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+              },
+              "w": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 8192
+              },
+              "h": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 8192
+              },
+              "colors": {
+                "type": "object",
+                "maxProperties": 16,
+                "propertyNames": {
+                  "pattern": "^[\\w-]{1,40}$"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^#[a-fA-F0-9]{6}$"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "x",
+              "y",
+              "scale",
+              "rotation",
+              "opacity",
+              "visible",
+              "locked",
+              "assetId",
+              "w",
+              "h"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[\\w-]{1,40}$"
+              },
+              "x": {
+                "type": "number",
+                "minimum": -8192,
+                "maximum": 8192
+              },
+              "y": {
+                "type": "number",
+                "minimum": -8192,
+                "maximum": 8192
+              },
+              "scale": {
+                "type": "number",
+                "minimum": 0.05,
+                "maximum": 20
+              },
+              "rotation": {
+                "type": "number",
+                "minimum": -360,
+                "maximum": 360
+              },
+              "opacity": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "visible": {
+                "type": "boolean"
+              },
+              "locked": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "type": {
+                "const": "text"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "fontSize": {
+                "type": "number",
+                "minimum": 8,
+                "maximum": 400
+              },
+              "color": {
+                "type": "string",
+                "pattern": "^#[a-fA-F0-9]{6}$"
+              },
+              "weight": {
+                "enum": [
+                  "normal",
+                  "bold"
+                ]
+              },
+              "align": {
+                "enum": [
+                  "left",
+                  "center",
+                  "right"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "x",
+              "y",
+              "scale",
+              "rotation",
+              "opacity",
+              "visible",
+              "locked",
+              "text",
+              "fontSize",
+              "color",
+              "weight",
+              "align"
+            ]
+          }
+        ]
+      },
+      "RecipeInputV2": {
+        "description": "Schema v2 (additive). Unknown fields are dropped. The server derives `components` (unique assetIds in layer order) so v1 readers and publication-check keep working. Every component layer's asset must belong to `style`.",
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "const": 2
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "style": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "accent": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "layout": {
+            "enum": [
+              "grid",
+              "free"
+            ]
+          },
+          "canvas": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 64,
+                "maximum": 4096
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 64,
+                "maximum": 4096
+              },
+              "background": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "width",
+              "height",
+              "background"
+            ]
+          },
+          "theme": {
+            "type": "object",
+            "properties": {
+              "colors": {
+                "type": "object",
+                "maxProperties": 32,
+                "propertyNames": {
+                  "pattern": "^[\\w-]{1,40}$"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^#[a-fA-F0-9]{6}$"
+                }
+              },
+              "tokens": {
+                "type": "object",
+                "maxProperties": 64,
+                "propertyNames": {
+                  "pattern": "^--[\\w-]{1,60}$"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^#[a-fA-F0-9]{6}$"
+                }
+              }
+            },
+            "required": [
+              "colors",
+              "tokens"
+            ]
+          },
+          "layers": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 40,
+            "description": "At most 12 component layers and 12 text layers.",
+            "items": {
+              "$ref": "#/components/schemas/RecipeLayer"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "title",
+          "style",
+          "accent",
+          "layout",
+          "canvas",
+          "theme",
+          "layers",
+          "version"
+        ]
+      },
+      "RecipeDocumentV2": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "const": 2
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "style": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+          },
+          "accent": {
+            "type": "string",
+            "pattern": "^#[a-fA-F0-9]{6}$"
+          },
+          "layout": {
+            "enum": [
+              "grid",
+              "free"
+            ]
+          },
+          "canvas": {
+            "type": "object",
+            "properties": {
+              "width": {
+                "type": "integer",
+                "minimum": 64,
+                "maximum": 4096
+              },
+              "height": {
+                "type": "integer",
+                "minimum": 64,
+                "maximum": 4096
+              },
+              "background": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^#[a-fA-F0-9]{6}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "width",
+              "height",
+              "background"
+            ]
+          },
+          "theme": {
+            "type": "object",
+            "properties": {
+              "colors": {
+                "type": "object",
+                "maxProperties": 32,
+                "propertyNames": {
+                  "pattern": "^[\\w-]{1,40}$"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^#[a-fA-F0-9]{6}$"
+                }
+              },
+              "tokens": {
+                "type": "object",
+                "maxProperties": 64,
+                "propertyNames": {
+                  "pattern": "^--[\\w-]{1,60}$"
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "pattern": "^#[a-fA-F0-9]{6}$"
+                }
+              }
+            },
+            "required": [
+              "colors",
+              "tokens"
+            ]
+          },
+          "layers": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 40,
+            "description": "At most 12 component layers and 12 text layers.",
+            "items": {
+              "$ref": "#/components/schemas/RecipeLayer"
+            }
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "assetId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "assetId"
+              ]
+            }
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "title",
+          "style",
+          "accent",
+          "layout",
+          "canvas",
+          "theme",
+          "layers",
+          "components"
+        ]
+      },
+      "RecipeRevisionSummary": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "updatedAt",
+          "title"
         ]
       }
     }

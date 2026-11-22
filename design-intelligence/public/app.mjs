@@ -1,5 +1,5 @@
 // Shirley Design Intelligence preview & recipe editor: session, wiring, responsive tabs.
-import { $, createStore, createAssetLoader, createFeedback } from './ui/core.mjs';
+import { $, el, createStore, createAssetLoader, createFeedback } from './ui/core.mjs';
 import { createApi } from './ui/api.mjs';
 import { createStorage } from './ui/storage.mjs';
 import { createLibrary } from './ui/library.mjs';
@@ -14,7 +14,7 @@ let started = false;
 
 const feedback = createFeedback();
 const storage = createStorage();
-const store = createStore({ styles: [], history: createHistory(emptyRecipe()), savedFp: fingerprint(emptyRecipe()), selected: -1, replacing: false, saving: false });
+const store = createStore({ styles: [], session: null, history: createHistory(emptyRecipe()), savedFp: fingerprint(emptyRecipe()), selected: -1, replacing: false, saving: false });
 const actions = {};
 const api = createApi({ getToken: () => token, onAuthFailure: () => logout('访问令牌无效或已过期，请重新登录。', { force: true }) });
 const assets = createAssetLoader(api);
@@ -32,7 +32,7 @@ Object.assign(actions, {
   libraryStyleChanged(id) {
     const recipe = store.get().history.present;
     const style = store.get().styles.find(s => s.id === id);
-    if (style?.colors && !recipe.components.length && recipe.style !== id) editor.reset(editor.freshRecipe(id, recipe.title));
+    if (style?.colors && !recipe.layers.length && recipe.style !== id) editor.reset(editor.freshRecipe(id, recipe.title, recipe.canvas));
   }
 });
 
@@ -61,9 +61,23 @@ async function logout(message = '', { force = false } = {}) {
   showLogin(message);
 }
 
+async function showRules(session) {
+  $('rules-box').hidden = true;
+  if (!session?.brandId) return;
+  try {
+    const { rules } = await api.json('/brands/' + encodeURIComponent(session.brandId) + '/design-rules');
+    const rows = Object.entries(rules ?? {}).slice(0, 20);
+    $('rules').replaceChildren(...rows.map(([key, value]) => el('div', {}, el('dt', { text: key }), el('dd', { text: typeof value === 'object' ? JSON.stringify(value) : String(value) }))));
+    $('rules-box').hidden = !rows.length;
+  } catch { /* rules are informational */ }
+}
+
 async function start() {
   const styles = (await api.json('/styles')).items;
-  store.set({ styles });
+  // /session (newer Worker) reports scope and write permission; an older Worker answers 404 and we assume write access.
+  const session = await api.json('/session').catch(error => { if (error.kind === 'auth') throw error; return null; });
+  store.set({ styles, session });
+  showRules(session);
   const first = styles.find(s => s.colors) ?? styles[0];
   library.renderStyles();
   if (!started) {

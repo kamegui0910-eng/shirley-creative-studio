@@ -54,23 +54,41 @@
 
     <div class="stack">
       <section id="panel-canvas" class="panel" data-panel="canvas" aria-labelledby="h-recipe">
-        <h2 id="h-recipe">设计配方 <span id="dirty" class="pill"></span></h2>
+        <h2 id="h-recipe">设计配方 <span id="dirty" class="pill"></span> <span id="mode-pill" class="pill" hidden></span></h2>
+        <p id="resume" class="hint" hidden></p>
         <div class="row">
           <label class="grow">名称<input id="title" maxlength="120"></label>
         </div>
         <div class="stage" id="stage">
-          <canvas id="canvas" tabindex="0" role="img" aria-label="组件合成预览。左右方向键切换选中组件，Delete 移除。"></canvas>
+          <canvas id="canvas" tabindex="0" role="img" aria-label="组件合成预览。拖动图层移动，拖动方形手柄缩放、圆形手柄旋转；左右方向键切换选中图层，Alt+方向键微调位置，Delete 移除。"></canvas>
           <p id="stage-empty" class="stage-empty">从素材库点击「添加」开始搭配</p>
         </div>
         <p id="canvas-status" class="hint" role="status" aria-live="polite"></p>
         <div class="toolbar" role="toolbar" aria-label="画布操作">
           <button id="undo" type="button">撤销</button>
           <button id="redo" type="button">重做</button>
+          <button id="add-text" type="button">添加文字</button>
+          <button id="auto-arrange" type="button" hidden>自动排列</button>
           <button id="clear" type="button">清空</button>
           <button id="export" type="button">导出 PNG</button>
         </div>
-        <p id="replace-hint" class="hint" hidden>替换模式：在素材库点击「替换」选择新组件，或再次点击槽位的「替换」取消。</p>
+        <p id="replace-hint" class="hint" hidden>替换模式：在素材库点击「替换」选择新组件，或再次点击图层的「取消替换」。</p>
+        <h3>图层 <span class="hint">（越靠后越在上层）</span></h3>
         <ol id="slots" class="slots"></ol>
+        <div id="inspector" class="inspector" aria-label="属性"></div>
+        <details id="canvas-settings">
+          <summary>画布设置</summary>
+          <div class="row">
+            <label class="grow">尺寸预设<select id="canvas-preset"></select></label>
+            <label>宽<input id="canvas-w" type="number" min="64" max="4096" step="1" inputmode="numeric"></label>
+            <label>高<input id="canvas-h" type="number" min="64" max="4096" step="1" inputmode="numeric"></label>
+          </div>
+          <div class="row">
+            <label>底色<input id="canvas-bg" type="color"></label>
+            <button id="canvas-bg-auto" type="button">跟随主色</button>
+            <span id="layout-label" class="hint"></span>
+          </div>
+        </details>
         <div class="row save-row">
           <button id="save" type="button" class="primary">保存配方</button>
           <button id="new" type="button">新建</button>
@@ -78,11 +96,17 @@
           <button id="load" type="button">恢复</button>
         </div>
         <p id="save-problems" class="hint"></p>
+        <details id="revisions-box">
+          <summary>版本历史</summary>
+          <p id="revisions-note" class="hint"></p>
+          <ul id="revisions" class="plain"></ul>
+        </details>
       </section>
 
       <section id="panel-theme" class="panel" data-panel="theme" aria-labelledby="h-theme">
         <h2 id="h-theme">品牌配色与 Token</h2>
         <p id="theme-note" class="hint"></p>
+        <details id="rules-box" hidden><summary>品牌规则</summary><dl id="rules" class="meta"></dl></details>
         <div id="palette" class="swatches"></div>
         <details id="tokens-box">
           <summary>设计 Token <span id="tokens-count"></span></summary>

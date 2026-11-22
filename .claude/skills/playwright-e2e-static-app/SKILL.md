@@ -19,9 +19,20 @@ description: Recipe for testing a no-build web UI with node:test + Playwright ag
 ## Product bugs this approach caught (check for regressions)
 stale hit-test rects after add/remove · color input ignoring the coarse-pointer min-height · "新建" reusing the old style · conflict path silently adopting identical content (intended; tests must make the two edits differ).
 
+## Reusable pieces (Sprint 01)
+- `tests/e2e-harness.mjs`: `startHarness()` (seed + real Worker + Chromium), `withContext`, helpers (`pointerDrag` for synthetic mouse/touch pointers, `toClient` canvas→screen, `canvasPng` for pixel-equality, `pngSize` pattern for export checks).
+- Pixel-identical reopen: compare `canvas.toDataURL()` before save and after reload+load (deselect first so no selection frame is drawn).
+- Races: `page.route(regex, async route => { await delay; route.continue(); })` on the *old* style's requests, switch style, wait past the delay, assert only the new style's ids are present.
+- Read-only principal: `DESIGN_DEV_READONLY_TOKEN`; legacy-server behaviour: `page.route` returning a v1 document and assert the UI does not claim "saved" (label such tests `[contract mock]`).
+- Real API: `tools/dev.mjs --upstream` + `NODE_USE_ENV_PROXY=1` (Node 22.21+ honors the sandbox HTTPS proxy). Always say which backend a green run used: real Worker + synthetic data ≠ deployed API.
+
+## Bugs this approach caught in Sprint 01
+undo past first save dropped the recipe id · stale revisions list flicker · `setPointerCapture` throwing on synthetic pointers · a stale `components` reference after the model change (found by a real console error, not by reading code).
+
 ## Sandbox pitfalls
 - `git reset --hard` is denied by the auto-mode classifier; use `git merge --ff-only origin/<branch>` when the local branch has no own commits.
 - Writing a script through a bash heredoc was blocked once as a "dangerous removal" false positive; create files with the Write tool and run them separately.
 - Do not `git rm --cached` to "check" a file; use `git status`/`git diff`. (If staged by mistake: `git reset -q HEAD -- <path>`.)
+- A host in the environment allow-list still needs a credential for authenticated APIs; `request_credential` refuses hostnames longer than 64 chars (the user must add the secret in environment settings).
 - Node here is v22; `node:sqlite` works with an ExperimentalWarning; `--test-isolation=none` does not exist before Node 24.
 - Stop background dev servers (`pkill -f tools/dev.mjs`) before re-running tests that spawn their own.

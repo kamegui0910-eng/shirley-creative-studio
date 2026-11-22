@@ -46,7 +46,7 @@ export function createLibrary({ api, assets, store, actions }) {
     };
     frame.load = load;
     if (observer) observer.observe(frame); else load();
-    const open = el('button', { type: 'button', class: 'card-open', 'aria-label': `查看详情：${item.name}（${KIND[item.kind] ?? item.kind}，${RIGHTS[item.rights] ?? item.rights}）`, onclick: () => actions.openDetail(item.assetId) },
+    const open = el('button', { type: 'button', class: 'card-open', title: item.name + ' · ' + item.assetId, 'aria-label': `查看详情：${item.name}（${KIND[item.kind] ?? item.kind}，${RIGHTS[item.rights] ?? item.rights}）`, onclick: () => actions.openDetail(item.assetId) },
       frame, el('span', { class: 'card-name', text: item.name }), el('span', { class: 'badge', 'data-rights': item.rights, text: RIGHTS[item.rights] ?? item.rights }));
     const replacing = store.get().replacing;
     const add = isComponent ? el('button', { type: 'button', class: 'card-add', 'data-add': item.assetId, text: replacing ? '替换' : '添加', 'aria-label': (replacing ? '替换为 ' : '添加 ') + item.name, onclick: () => actions.addAsset({ assetId: item.assetId, name: item.name }, view.style) }) : null;
@@ -92,17 +92,24 @@ export function createLibrary({ api, assets, store, actions }) {
     }
   }
 
+  // Category requests are cancelled and ignored when the style changes; stale chips are never shown or clickable.
+  let categoryController = null;
   async function loadCategories() {
+    categoryController?.abort();
+    categoryController = new AbortController();
+    const { signal } = categoryController;
     const style = view.style;
     const box = $('categories');
+    box.setAttribute('aria-busy', 'true');
+    box.replaceChildren(el('span', { class: 'hint', text: '分类加载中…' }));
     try {
-      const result = await api.json('/categories' + (style ? '?style=' + encodeURIComponent(style) : ''));
-      if (style !== view.style) return;
+      const result = await api.json('/categories' + (style ? '?style=' + encodeURIComponent(style) : ''), { signal });
+      if (signal.aborted || style !== view.style) return;
       box.replaceChildren(...[{ id: '', label: '全部分类' }, ...result.items].map(item =>
         el('button', { type: 'button', class: 'chip', 'aria-pressed': String(item.id === view.category), dataset: { category: item.id }, text: item.label, onclick: () => { view.category = item.id; renderChips(); search(); } })));
     } catch (error) {
-      if (error.kind !== 'abort') box.replaceChildren(el('span', { class: 'hint', text: '分类加载失败 ' }), el('button', { type: 'button', class: 'link', text: '重试', onclick: loadCategories }));
-    }
+      if (error.kind !== 'abort' && !signal.aborted) box.replaceChildren(el('span', { class: 'hint', text: '分类加载失败 ' }), el('button', { type: 'button', class: 'link', text: '重试', onclick: loadCategories }));
+    } finally { if (!signal.aborted) box.setAttribute('aria-busy', 'false'); }
   }
   const renderChips = () => $('categories').querySelectorAll('.chip').forEach(chip => chip.setAttribute('aria-pressed', String(chip.dataset.category === view.category)));
 

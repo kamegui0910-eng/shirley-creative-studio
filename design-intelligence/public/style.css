@@ -82,7 +82,7 @@ section,form{background:#fff;border:1px solid var(--line);border-radius:18px;pad
 
 /* editor */
 .stage{position:relative;border:1px solid #ebdbe4;border-radius:12px;background:#faeff6;overflow:hidden}
-canvas{display:block;width:100%;aspect-ratio:4/3;height:auto;touch-action:manipulation}
+canvas{display:block;margin:0 auto;max-width:100%;height:auto;touch-action:none;cursor:default}
 .stage-empty{position:absolute;inset:0;display:grid;place-items:center;margin:0;color:var(--muted);pointer-events:none;text-align:center;padding:16px}
 .toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
 .slots{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px}
@@ -91,6 +91,19 @@ canvas{display:block;width:100%;aspect-ratio:4/3;height:auto;touch-action:manipu
 .slot-main{flex:1 1 150px;display:flex;align-items:center;gap:8px;border:0;background:transparent;text-align:left;min-width:0;overflow-wrap:anywhere}
 .slot-main img{width:32px;height:32px;object-fit:contain;flex:none;background:#fff;border-radius:6px}
 .save-row{margin-top:6px}
+.slot[data-hidden=true] .slot-main{opacity:.5;text-decoration:line-through}
+.glyph{display:grid;place-items:center;width:32px;height:32px;flex:none;background:#fff;border-radius:6px;font-weight:700;color:var(--accent)}
+.inspector{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:0 0 12px;background:#fcf7fa}
+.inspector h3{margin:4px 0 8px}
+.field{display:grid;grid-template-columns:96px minmax(0,1fr) 84px;gap:8px;align-items:center;margin-bottom:6px}
+.field input[type=range]{min-height:0;padding:0;border:0;background:transparent}
+.field input[type=number]{width:100%}
+.field textarea{grid-column:2 / -1}
+.field select{grid-column:2 / -1}
+.field input[type=text]{grid-column:2 / -1;width:100%}
+#canvas-settings{margin:8px 0 12px}
+#canvas-settings summary,#revisions-box summary,#tokens-box summary,#rules-box summary{cursor:pointer;font-weight:650;margin-bottom:8px}
+#revisions li{margin-bottom:4px;font-size:.85rem}
 
 /* theme */
 .swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin-bottom:12px}

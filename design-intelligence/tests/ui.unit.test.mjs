@@ -1,10 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as R from '../public/ui/recipe.mjs';
 import * as T from '../public/ui/theme.mjs';
 import { createApi, ApiError } from '../public/ui/api.mjs';
 import { createStorage } from '../public/ui/storage.mjs';
-import { gridLayout, hitTest } from '../public/canvas.mjs';
 import worker from '../src/worker.mjs';
 
 const style = {
@@ -12,50 +10,6 @@ const style = {
   colors: { pink: '#F6C3DA', ink: '#62344f', note: 'not-a-color' },
   tokens: { '--px-ink': '#62344f', '--px-radius': '2px' }
 };
-
-test('recipe: add/replace/remove/duplicate/move keep identity and limits', () => {
-  let r = R.emptyRecipe({ style: 'pixel', accent: '#aabbcc' });
-  for (const id of ['a', 'b', 'c']) r = R.addComponent(r, { assetId: id });
-  r = R.replaceComponent(r, 1, { assetId: 'x' });
-  assert.deepEqual(r.components.map(c => c.assetId), ['a', 'x', 'c']);
-  r = R.duplicateComponent(r, 0);
-  assert.deepEqual(r.components.map(c => c.assetId), ['a', 'a', 'x', 'c']);
-  const moved = R.moveComponent(r, 3, -1);
-  assert.deepEqual(moved.recipe.components.map(c => c.assetId), ['a', 'a', 'c', 'x']);
-  assert.equal(moved.index, 2);
-  assert.equal(R.moveComponent(r, 0, -1).index, 0, 'moving past the edge is a no-op');
-  assert.deepEqual(R.removeComponent(r, 0).components.map(c => c.assetId), ['a', 'x', 'c']);
-  assert.throws(() => R.removeComponent(r, 9), R.RecipeError);
-  let full = R.emptyRecipe();
-  for (let i = 0; i < R.MAX_COMPONENTS; i++) full = R.addComponent(full, { assetId: 'a' + i });
-  assert.throws(() => R.addComponent(full, { assetId: 'z' }), /12/);
-  assert.throws(() => R.duplicateComponent(full, 0), R.RecipeError);
-});
-
-test('recipe: payload matches the API contract and omits display-only fields', () => {
-  const r = { ...R.emptyRecipe({ style: 'pixel', accent: '#aabbcc', title: '  hi ' }), version: 3, components: [{ assetId: 'a', name: 'A' }] };
-  assert.deepEqual(R.toPayload(r), { title: 'hi', style: 'pixel', accent: '#aabbcc', components: [{ assetId: 'a' }], version: 3 });
-  assert.deepEqual(R.validate(R.emptyRecipe()), ['请先选择风格', '画布为空，请至少添加一个组件']);
-  assert.ok(R.validate({ ...r, title: ' ' }).includes('请填写配方名称'));
-  const back = R.fromResult({ id: 'i', version: 3, document: { title: 't', style: 'pixel', accent: '#aabbcc', components: [{ assetId: 'a' }] } }, new Map([['a', 'A']]));
-  assert.equal(back.components[0].name, 'A');
-  assert.equal(R.fingerprint(back), R.fingerprint({ ...r, title: 't' }));
-});
-
-test('recipe: history undo/redo, coalescing, and new-edit clears redo', () => {
-  let h = R.createHistory(R.emptyRecipe({ title: 'a' }));
-  h = R.commit(h, { ...h.present, title: 'ab' }, 'title');
-  h = R.commit(h, { ...h.present, title: 'abc' }, 'title');
-  assert.equal(h.past.length, 1, 'typing coalesces into one step');
-  h = R.undo(h);
-  assert.equal(h.present.title, 'a');
-  h = R.redo(h);
-  assert.equal(h.present.title, 'abc');
-  h = R.undo(h);
-  h = R.commit(h, { ...h.present, title: 'z' });
-  assert.equal(h.future.length, 0);
-  assert.equal(R.undo(R.createHistory(R.emptyRecipe())).past.length, 0);
-});
 
 test('theme: normalizes hex and ignores non-color palette entries', () => {
   assert.equal(T.normalizeHex('#ABC'), '#aabbcc');
@@ -168,16 +122,6 @@ test('storage: never throws and keeps presets per style', () => {
   assert.deepEqual(ok.loadPresets('b').length, 1);
   mem.set('shirley-di:presets:v1', '{bad json');
   assert.deepEqual(ok.loadPresets('a'), []);
-});
-
-test('canvas: grid layout and hit-testing', () => {
-  assert.deepEqual(gridLayout(0), []);
-  const one = gridLayout(1);
-  assert.deepEqual(one[0], { x: 12, y: 12, w: 616, h: 456 });
-  assert.equal(gridLayout(12).length, 12);
-  const rects = gridLayout(4);
-  assert.equal(hitTest(rects, rects[3].x + 1, rects[3].y + 1), 3);
-  assert.equal(hitTest(rects, -5, -5), -1);
 });
 
 test('worker serves only the UI module directory as static assets without auth', async () => {

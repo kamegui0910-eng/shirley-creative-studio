@@ -21,7 +21,9 @@ Open the loopback URL printed by the server and enter its locally generated toke
 - **素材库**: Style × Category browsing, name search, kind and rights filters, pagination, lazy PNG previews, detail dialog (SVG with the current theme, PNG preview, rights, Drive IDs, lineage, source records).
 - **设计配方**: add / replace / reorder / duplicate / remove, undo/redo, Canvas 2D composition, PNG export, save/restore with optimistic versioning, local draft recovery, retry on failure.
 - **品牌配色与 Token**: palette and token overrides applied to the SVG text, local presets, CSS-variable export. Only the primary color persists as the recipe `accent`; see [`docs/UI_API_CONTRACT.md`](docs/UI_API_CONTRACT.md) for what is local-only and the proposed API additions.
+- **Recipe schema v2** (canvas size, layers with move/scale/rotate/opacity/lock/hide, text layers, per-instance colors, theme, free vs automatic layout); v1 recipes still open and are upgraded on save. Undo/redo history survives a refresh (local) and the Worker can keep a revision per save (`DESIGN_REVISIONS=enabled`, migration 0003).
 - Below 900px the three panels become bottom tabs.
+- Tests against a deployed API: `DESIGN_API_BASE=<origin> DESIGN_API_TOKEN=<token> node --test tests/cloud.e2e.test.mjs` (see the verification matrix in the contract doc).
 
 Try it without private data: `npm run dev:demo` serves a synthetic index (30 components in two kits, restricted / commercial-ready / no-preview / 404-preview cases). `npm test` runs unit tests and a Chromium end-to-end suite against that synthetic index (skipped automatically if Playwright is unavailable).
 

@@ -9,6 +9,18 @@ export function createStorage(area = globalThis.localStorage) {
     loadDraft: () => read('draft:v1'),
     saveDraft: draft => write('draft:v1', draft),
     clearDraft: () => remove('draft:v1'),
+    // Undo/redo history per saved recipe, so it survives a refresh. Only the 6 most recently written recipes are kept.
+    loadHistory(id) { const all = read('history:v1'); return all?.[id] ?? null; },
+    saveHistory(id, entry) {
+      const all = read('history:v1') ?? {};
+      delete all[id];
+      all[id] = entry;
+      for (const key of Object.keys(all).slice(0, -6)) delete all[key];
+      return write('history:v1', all);
+    },
+    clearHistory(id) { const all = read('history:v1') ?? {}; delete all[id]; return write('history:v1', all); },
+    loadLast: () => read('last:v1'),
+    saveLast: entry => write('last:v1', entry),
     // Theme presets are local to this browser, keyed by style id.
     loadPresets: styleId => { const all = read('presets:v1'); return Array.isArray(all?.[styleId]) ? all[styleId] : []; },
     savePreset(styleId, preset) {
