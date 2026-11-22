@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Shirley Design API",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "security": [
     {
@@ -293,6 +293,48 @@
               "type": "string",
               "pattern": "^[a-zA-Z0-9_-]{1,100}$"
             }
+          },
+          {
+            "name": "color",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^#[A-Fa-f0-9]{6}$"
+            },
+            "description": "Exact normalized palette color."
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 150
+            },
+            "description": "Alias for q. q takes priority."
+          },
+          {
+            "name": "styleId",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,100}$"
+              }
+            },
+            "description": "Alias for style."
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]{1,100}$"
+              }
+            },
+            "description": "Alias for category."
           }
         ],
         "responses": {
@@ -917,6 +959,303 @@
           }
         }
       }
+    },
+    "/design-recipes/{id}/history": {
+      "get": {
+        "operationId": "listRecipeHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "version",
+                          "updatedAt"
+                        ]
+                      }
+                    },
+                    "nextBefore": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextBefore"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}/history/{version}": {
+      "get": {
+        "operationId": "getRecipeHistoryVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/design-recipes/{id}/restore": {
+      "post": {
+        "operationId": "restoreRecipeVersion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Recipe"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Scope or permission forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found in the authorized scope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recipe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Recipe version conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "restoreVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "version",
+                  "restoreVersion"
+                ]
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1032,6 +1371,40 @@
           },
           "hasPreview": {
             "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,100}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^#[A-Fa-f0-9]{6}$"
+            }
+          },
+          "styleIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
+          },
+          "categoryIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{1,100}$"
+            }
           }
         },
         "required": [
@@ -1165,6 +1538,26 @@
                 "payload"
               ]
             }
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,100}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "colors": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^#[A-Fa-f0-9]{6}$"
+            }
           }
         },
         "required": [
@@ -1209,6 +1602,9 @@
                 "assetId": {
                   "type": "string",
                   "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                },
+                "layout": {
+                  "$ref": "#/components/schemas/ComponentLayout"
                 }
               },
               "required": [
@@ -1219,6 +1615,18 @@
           "version": {
             "type": "integer",
             "minimum": 0
+          },
+          "layout": {
+            "$ref": "#/components/schemas/RecipeLayout"
+          },
+          "layers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipeLayer"
+            }
+          },
+          "theme": {
+            "$ref": "#/components/schemas/RecipeTheme"
           }
         },
         "required": [
@@ -1270,12 +1678,27 @@
                     "assetId": {
                       "type": "string",
                       "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+                    },
+                    "layout": {
+                      "$ref": "#/components/schemas/ComponentLayout"
                     }
                   },
                   "required": [
                     "assetId"
                   ]
                 }
+              },
+              "layout": {
+                "$ref": "#/components/schemas/RecipeLayout"
+              },
+              "layers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/RecipeLayer"
+                }
+              },
+              "theme": {
+                "$ref": "#/components/schemas/RecipeTheme"
               }
             },
             "required": [
@@ -1292,6 +1715,108 @@
           "updatedAt",
           "document"
         ]
+      },
+      "ComponentLayout": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 2
+          },
+          "y": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 2
+          },
+          "scale": {
+            "type": "number",
+            "minimum": 0.05,
+            "maximum": 8
+          },
+          "rotation": {
+            "type": "number",
+            "minimum": -360,
+            "maximum": 360
+          }
+        },
+        "required": [
+          "x",
+          "y",
+          "scale",
+          "rotation"
+        ]
+      },
+      "RecipeLayout": {
+        "type": "object",
+        "properties": {
+          "width": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 2048
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 2048
+          },
+          "background": {
+            "type": "string",
+            "pattern": "^#[A-Fa-f0-9]{6}$"
+          }
+        },
+        "required": [
+          "width",
+          "height"
+        ]
+      },
+      "RecipeLayer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{1,100}$"
+          },
+          "componentIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 11
+          },
+          "opacity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "componentIndex"
+        ]
+      },
+      "RecipeTheme": {
+        "type": "object",
+        "properties": {
+          "colors": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^#[A-Fa-f0-9]{6}$"
+            }
+          },
+          "tokens": {
+            "type": "object",
+            "maxProperties": 32,
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        },
+        "required": []
       }
     }
   }

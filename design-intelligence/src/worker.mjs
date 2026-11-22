@@ -1,7 +1,8 @@
+import { recipeDocument, validId } from './recipe.mjs';
+
 const rights = ['reference_only', 'unverified', 'restricted', 'commercial_ready'];
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 const failure = (message, status) => json({ error: message }, status);
-const validId = value => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,100}$/.test(value);
 
 export async function tokenDigest(token) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
@@ -37,6 +38,11 @@ async function boundedJSON(request) {
 
 const recipeView = row => ({ id: row.id, version: row.version, updatedAt: row.updated_at, document: JSON.parse(row.document) });
 const assetColumns = 'a.asset_id AS assetId, a.name, a.drive_id AS driveFileId, a.version, a.kind, a.rights, a.review';
+const assetMetadata = ' LEFT JOIN asset_search_metadata m USING(tenant_id,brand_id,asset_id)';
+const assetView = ({ keywords, ...row }) => ({
+  ...row, id: row.assetId, title: row.name, colors: JSON.parse(row.colors ?? '[]')
+});
+
 
 async function route(request, env, url, scope) {
   const { pathname: path, searchParams: params } = url;
@@ -46,7 +52,7 @@ async function route(request, env, url, scope) {
   const all = async (sql, ...args) => (await select(sql, ...args).all()).results;
   const one = (sql, ...args) => select(sql, ...args).first();
   const where = 'tenant_id=? AND brand_id=?';
-  const getAsset = id => one('SELECT ' + assetColumns + ', a.evidence FROM assets a WHERE a.tenant_id=? AND a.brand_id=? AND a.asset_id=?', ...keys, id);
+  const getAsset = id => one('SELECT ' + assetColumns + ', a.evidence, m.summary, m.colors FROM assets a' + assetMetadata + ' WHERE a.tenant_id=? AND a.brand_id=? AND a.asset_id=?', ...keys, id);
   if (params.has('tenantId') && params.get('tenantId') !== tenantId || params.has('brandId') && params.get('brandId') !== brandId) {
     return failure('Scope forbidden', 403);
   }
@@ -66,23 +72,26 @@ async function route(request, env, url, scope) {
       const cursor = params.get('cursor') ?? '';
       const kind = params.get('kind');
       const right = params.get('rights');
-      const term = params.get('q') ?? '';
+      const term = (params.get('q') ?? params.get('keyword') ?? '').trim();
+      const color = params.get('color')?.toLowerCase();
       if (!Number.isInteger(limit) || limit < 1 || limit > 100 || cursor && !validId(cursor) ||
-          right && !rights.includes(right) || kind && !['component', 'reference'].includes(kind) || term.length > 150) return failure('Invalid filter', 400);
+          right && !rights.includes(right) || kind && !['component', 'reference'].includes(kind) || term.length > 150 || (color && !/^#[0-9a-f]{6}$/.test(color))) return failure('Invalid filter', 400);
       const clauses = ['a.tenant_id=?', 'a.brand_id=?', 'a.asset_id>?'];
       const bindings = [...keys, cursor];
       for (const [param, column] of [['style', 'style_id'], ['category', 'category_id']]) {
-        const values = [...new Set(params.getAll(param))];
+        const values = [...new Set([...params.getAll(param), ...params.getAll(param + 'Id')])];
         if (values.length > 10 || values.some(value => !validId(value))) return failure('Invalid taxonomy filter', 400);
         if (!values.length) continue;
         clauses.push('EXISTS (SELECT 1 FROM asset_tags t WHERE t.tenant_id=a.tenant_id AND t.brand_id=a.brand_id AND t.asset_id=a.asset_id AND t.' + column + ' IN (' + values.map(() => '?').join(',') + '))');
         bindings.push(...values);
       }
-      for (const [value, clause] of [[kind, 'a.kind=?'], [right, 'a.rights=?'], [term, 'instr(lower(a.name),lower(?))>0']]) {
+      for (const [value, clause] of [[kind, 'a.kind=?'], [right, 'a.rights=?'],
+        [term, "instr(lower(a.name || ' ' || coalesce(m.keywords,'')),lower(?))>0"],
+        [color, 'EXISTS (SELECT 1 FROM json_each(m.colors) WHERE value=?)']]) {
         if (value) { clauses.push(clause); bindings.push(value); }
       }
-      const rows = await all('SELECT ' + assetColumns + ', EXISTS (SELECT 1 FROM asset_variants v WHERE v.tenant_id=a.tenant_id AND v.brand_id=a.brand_id AND v.asset_id=a.asset_id AND v.kind=\'preview\') AS hasPreview FROM assets a WHERE ' + clauses.join(' AND ') + ' ORDER BY a.asset_id LIMIT ?', ...bindings, limit + 1);
-      const items = rows.slice(0, limit).map(row => ({ ...row, hasPreview: Boolean(row.hasPreview) }));
+      const rows = await all('SELECT ' + assetColumns + ', m.summary, m.colors, (SELECT json_group_array(t.style_id) FROM asset_tags t WHERE t.tenant_id=a.tenant_id AND t.brand_id=a.brand_id AND t.asset_id=a.asset_id AND t.style_id IS NOT NULL) AS styleIds, (SELECT json_group_array(t.category_id) FROM asset_tags t WHERE t.tenant_id=a.tenant_id AND t.brand_id=a.brand_id AND t.asset_id=a.asset_id AND t.category_id IS NOT NULL) AS categoryIds, EXISTS (SELECT 1 FROM asset_variants v WHERE v.tenant_id=a.tenant_id AND v.brand_id=a.brand_id AND v.asset_id=a.asset_id AND v.kind=\'preview\') AS hasPreview FROM assets a' + assetMetadata + ' WHERE ' + clauses.join(' AND ') + ' ORDER BY a.asset_id LIMIT ?', ...bindings, limit + 1);
+      const items = rows.slice(0, limit).map(row => ({ ...assetView(row), styleIds: JSON.parse(row.styleIds), categoryIds: JSON.parse(row.categoryIds), hasPreview: Boolean(row.hasPreview) }));
       return json({ items, nextCursor: rows.length > limit ? items.at(-1).assetId : null });
     }
     const asset = path.match(/^\/assets\/([\w-]+)(?:\/(preview|vector))?$/);
@@ -109,7 +118,7 @@ async function route(request, env, url, scope) {
       const variants = await all('SELECT kind,drive_id AS driveFileId FROM asset_variants WHERE ' + where + ' AND asset_id=?', ...keys, id);
       const sources = await all('SELECT source_kind AS kind,payload FROM asset_sources WHERE ' + where + ' AND asset_id=? ORDER BY source_kind,source_key', ...keys, id);
       const lineage = await all('SELECT source_id AS assetId,relation FROM asset_lineage WHERE ' + where + ' AND asset_id=?', ...keys, id);
-      return json({ ...record, styles: tags.map(row => row.style_id).filter(Boolean), categories: tags.map(row => row.category_id).filter(Boolean), variants, lineage,
+      return json({ ...assetView(record), styles: tags.map(row => row.style_id).filter(Boolean), categories: tags.map(row => row.category_id).filter(Boolean), variants, lineage,
         sources: sources.map(row => ({ ...row, payload: JSON.parse(row.payload) })) });
     }
     const brand = path.match(/^\/brands\/([\w-]+)\/design-rules$/);
@@ -120,15 +129,28 @@ async function route(request, env, url, scope) {
     }
   }
 
-  const recipe = path.match(/^\/design-recipes\/([\w-]{1,100})(\/publication-check)?$/);
+  const recipe = path.match(/^\/design-recipes\/([\w-]{1,100})(?:\/(publication-check|history|restore)(?:\/(\d+))?)?$/);
   if (!recipe) return failure('Route not found', 404);
-  const [, id, publication] = recipe;
+  const [, id, action, versionPath] = recipe;
   const readRecipe = () => one('SELECT * FROM design_recipes WHERE ' + where + ' AND id=?', ...keys, id);
+  const readVersion = version => one('SELECT * FROM recipe_versions WHERE ' + where + ' AND id=? AND version=?', ...keys, id, version);
+  if (action === 'history' && request.method === 'GET') {
+    if (!(await readRecipe())) return failure('Recipe not found', 404);
+    if (versionPath) {
+      const snapshot = await readVersion(Number(versionPath));
+      return snapshot ? json(recipeView(snapshot)) : failure('Version not found', 404);
+    }
+    const before = Number(params.get('before') ?? Number.MAX_SAFE_INTEGER);
+    if (!Number.isSafeInteger(before) || before < 1) return failure('Invalid history cursor', 400);
+    const rows = await all('SELECT version, updated_at AS updatedAt FROM recipe_versions WHERE ' + where + ' AND id=? AND version<? ORDER BY version DESC LIMIT 51', ...keys, id, before);
+    return json({ items: rows.slice(0,50), nextBefore: rows.length > 50 ? rows[49].version : null });
+  }
   if (request.method === 'GET') {
     const row = await readRecipe();
     if (!row) return failure('Recipe not found', 404);
     const result = recipeView(row);
-    if (!publication) return json(result);
+    if (versionPath || (action && action !== 'publication-check')) return failure('Route not found', 404);
+    if (!action) return json(result);
     const blockers = [];
     for (const component of result.document.components) {
       const asset = await getAsset(component.assetId);
@@ -136,21 +158,24 @@ async function route(request, env, url, scope) {
     }
     return json({ allowed: blockers.length === 0, blockers });
   }
-  if (request.method !== 'PUT' || publication) return failure('Method not allowed', 405);
+  if (versionPath || (action ? action !== 'restore' || request.method !== 'POST' : request.method !== 'PUT')) return failure('Method not allowed', 405);
   if (scope.write !== true) return failure('Write forbidden', 403);
   let body;
   try { body = await boundedJSON(request); } catch { return failure('Invalid recipe body', 400); }
-  if (!body || !Number.isSafeInteger(body.version) || body.version < 0 || typeof body.title !== 'string' ||
-      body.title.length < 1 || body.title.length > 120 || !validId(body.style) || !Array.isArray(body.components) ||
-      body.components.length < 1 || body.components.length > 12 || !/^#[a-f0-9]{6}$/i.test(body.accent)) return failure('Invalid recipe', 400);
-  const components = [];
-  for (const item of body.components) {
-    if (!validId(item?.assetId)) return failure('Invalid component', 400);
-    const row = await one('SELECT 1 FROM components WHERE ' + where + ' AND asset_id=? AND style_id=?', ...keys, item.assetId, body.style);
-    if (!row) return failure('Component not found in style', 404);
-    components.push({ assetId: item.assetId });
+  if (!body || !Number.isSafeInteger(body.version) || body.version < 0) return failure('Invalid recipe version', 400);
+  let validated;
+  if (action === 'restore') {
+    if (body.version < 1 || !Number.isSafeInteger(body.restoreVersion) || body.restoreVersion < 1) return failure('Invalid restore version', 400);
+    const snapshot = await readVersion(body.restoreVersion);
+    if (!snapshot || !(await readRecipe())) return failure('Version not found', 404);
+    validated = JSON.parse(snapshot.document);
+  } else {
+    try { validated = recipeDocument(body); } catch (error) { return failure(error.message, 400); }
   }
-  const document = JSON.stringify({ title: body.title, style: body.style, accent: body.accent, components });
+  const ids = [...new Set(validated.components.map(item => item.assetId))];
+  const found = await all('SELECT asset_id FROM components WHERE ' + where + ' AND style_id=? AND asset_id IN (' + ids.map(() => '?').join(',') + ')', ...keys, validated.style, ...ids);
+  if (found.length !== ids.length) return failure('Component not found in style', 404);
+  const document = JSON.stringify(validated);
   const now = new Date().toISOString();
   const saved = body.version === 0
     ? await one('INSERT INTO design_recipes VALUES (?,?,?,1,?,?) ON CONFLICT DO NOTHING RETURNING *', ...keys, id, document, now)
@@ -162,7 +187,8 @@ export default {
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
-      if (['/', '/index.html', '/app.mjs', '/canvas.mjs', '/style.css'].includes(url.pathname)) return env.STATIC.fetch(request);
+      if (['GET','HEAD'].includes(request.method) && (['/', '/index.html', '/app.mjs', '/canvas.mjs', '/style.css'].includes(url.pathname) ||
+          /^\/ui\/[\w-]+\.mjs$/.test(url.pathname))) return env.STATIC.fetch(request);
       const scope = await authorize(request, env);
       if (!scope) return failure('Authentication required', 401);
       return await route(request, env, url, scope);

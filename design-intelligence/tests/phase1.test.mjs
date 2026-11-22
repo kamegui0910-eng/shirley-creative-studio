@@ -88,11 +88,13 @@ test('Migration rollback and reapply preserve unrelated tables', () => {
   const scratch = openIndex(':memory:');
   scratch.exec('CREATE TABLE unrelated (id INTEGER); INSERT INTO unrelated VALUES (1)');
   const readSQL = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+  scratch.exec(readSQL('../rollback/0003_recipe_search.sql'));
   scratch.exec(readSQL('../rollback/0002_preview_cache.sql'));
   scratch.exec(readSQL('../rollback/0001_index.sql'));
   assert.deepEqual(scratch.prepare("SELECT name FROM sqlite_schema WHERE type='table'").all().map(x => x.name), ['unrelated']);
   scratch.exec(readSQL('../migrations/0001_index.sql'));
   scratch.exec(readSQL('../migrations/0002_preview_cache.sql'));
+  scratch.exec(readSQL('../migrations/0003_recipe_search.sql'));
   assert.equal(scratch.prepare('SELECT id FROM unrelated').get().id, 1);
   assert.deepEqual(scratch.prepare('PRAGMA foreign_key_check').all(), []);
   scratch.close();
@@ -145,3 +147,28 @@ test('Drive baseline: exact source preservation, all kits, thumbnails, queue, ca
       actual.close();
     }
   });
+
+test('Recipe snapshots preserve the extended schema and restore under the same version lock', async () => {
+  const path = '/design-recipes/history-test';
+  const full = { ...recipe, layout: { width: 960, height: 640, background: '#ffeedd' },
+    components: [{ assetId: 'icon', layout: { x: .25, y: .75, scale: 1.2, rotation: 45 } }],
+    layers: [{ id: 'base', componentIndex: 0, opacity: .5, visible: true }],
+    theme: { colors: { pink: '#aabbcc' }, tokens: { '--test-ink': '#123456' } } };
+  const a = await (await request(path, { body: full })).json();
+  assert.deepEqual(a.document.layout, full.layout);
+  assert.deepEqual(a.document.layers, full.layers);
+  assert.deepEqual(a.document.theme, full.theme);
+  assert.deepEqual(a.document.components, full.components);
+  await request(path, { body: { ...full, version: 1, title: 'Revision 2' } });
+  const read = await (await request(path + '/history/1')).json();
+  assert.deepEqual(read, a);
+  const restore = await worker.fetch(new Request('http://test.local' + path + '/restore', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: JSON.stringify({ version: 2, restoreVersion: 1 })
+  }), env);
+  assert.equal(restore.status, 200);
+  const restored = await restore.json();
+  assert.equal(restored.version, 3);
+  assert.deepEqual(restored.document, a.document);
+  assert.deepEqual((await (await request(path + '/history')).json()).items.map(row => row.version), [3,2,1]);
+  assert.equal((await request(path + '/history/1', { bearer: other })).status, 404);
+});

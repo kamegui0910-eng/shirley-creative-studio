@@ -1,26 +1,149 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shirley Design Intelligence</title><link rel="stylesheet" href="/style.css"></head>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#251e25">
+<title>Shirley Design Intelligence</title>
+<link rel="stylesheet" href="/style.css">
+</head>
 <body>
-<header><p class="wordmark">SHIRLEY <span>STUDIO</span></p><h1>Design Intelligence</h1></header>
-<main>
-<form id="login"><label for="token">预览访问令牌</label><div class="controls"><input id="token" type="password" required autocomplete="off"><button>打开工作台</button></div></form>
-<p id="status" role="status" aria-live="polite"></p>
-<div id="workspace" hidden>
-<section aria-labelledby="library-heading">
-<h2 id="library-heading">组件库</h2>
-<div class="controls"><label>风格<select id="style"></select></label><label>分类<select id="category"></select></label></div>
-<div id="library"></div><button id="more" hidden>加载更多</button>
-</section>
-<section aria-labelledby="recipe-heading">
-<h2 id="recipe-heading">设计配方</h2>
-<div class="controls"><label>名称<input id="title" value="新设计" maxlength="120"></label><label>配色<input id="accent" type="color" value="#f6c3da"></label></div>
-<div class="stage"><canvas id="canvas" width="640" height="480" aria-label="组件合成预览"></canvas></div>
-<p class="hint">选择下方槽位后，从组件库替换。取消选择可继续添加。</p>
-<div id="slots"></div>
-<div class="controls"><button id="save">保存配方</button><label>配方 ID<input id="recipeId"></label><button id="load">恢复</button></div>
-</section>
+<header class="top">
+  <div>
+    <p class="wordmark">SHIRLEY <span>STUDIO</span></p>
+    <h1>Design Intelligence</h1>
+  </div>
+  <div class="top-actions">
+    <span id="conn" class="pill" hidden></span>
+    <button id="logout" type="button" hidden>退出</button>
+  </div>
+</header>
+
+<div id="banner" role="alert" hidden>
+  <span id="banner-text"></span>
+  <span id="banner-actions"></span>
+  <button id="banner-close" type="button" aria-label="关闭提示">×</button>
 </div>
+
+<main>
+  <form id="login">
+    <label for="token">预览访问令牌</label>
+    <div class="row">
+      <input id="token" type="password" required autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="login-submit">打开工作台</button>
+    </div>
+    <label class="check"><input id="remember" type="checkbox"> 在此标签页内记住（关闭标签页即清除）</label>
+    <p id="login-error" class="error-text" role="alert"></p>
+  </form>
+
+  <div id="app" hidden>
+    <section id="panel-library" class="panel" data-panel="library" aria-labelledby="h-lib">
+      <h2 id="h-lib">素材库</h2>
+      <div class="filters">
+        <label>风格<select id="style"></select></label>
+        <label>类型<select id="kind"><option value="component">组件</option><option value="reference">参考图</option><option value="">全部</option></select></label>
+        <label>权利状态<select id="rights"><option value="">全部</option><option value="reference_only">仅参考</option><option value="unverified">未验证</option><option value="restricted">受限</option><option value="commercial_ready">可商用</option></select></label>
+        <label class="grow">搜索名称或摘要<input id="q" type="search" maxlength="150" placeholder="例如 house、heart" autocomplete="off"></label>
+      </div>
+      <div id="categories" class="chips" role="group" aria-label="分类"></div>
+      <p id="result-meta" class="hint" role="status" aria-live="polite"></p>
+      <div id="library" class="grid" aria-busy="false"></div>
+      <div id="library-state" class="state" hidden></div>
+      <button id="more" type="button" hidden>加载更多</button>
+    </section>
+
+    <div class="stack">
+      <section id="panel-canvas" class="panel" data-panel="canvas" aria-labelledby="h-recipe">
+        <h2 id="h-recipe">设计配方 <span id="dirty" class="pill"></span></h2>
+        <div class="row">
+          <label class="grow">名称<input id="title" maxlength="120"></label>
+        </div>
+        <div class="stage" id="stage">
+          <canvas id="canvas" tabindex="0" role="img" aria-label="组件合成预览。左右方向键切换选中组件，Delete 移除。"></canvas>
+          <p id="stage-empty" class="stage-empty">从素材库点击「添加」开始搭配</p>
+        </div>
+        <p id="canvas-status" class="hint" role="status" aria-live="polite"></p>
+        <div class="toolbar" role="toolbar" aria-label="画布操作">
+          <button id="undo" type="button">撤销</button>
+          <button id="redo" type="button">重做</button>
+          <button id="clear" type="button">清空</button>
+          <button id="export" type="button">导出 PNG</button>
+        </div>
+        <p id="replace-hint" class="hint" hidden>替换模式：在素材库点击「替换」选择新组件，或再次点击槽位的「替换」取消。</p>
+        <details>
+          <summary>布局与图层</summary>
+          <div class="row">
+            <label>宽<input id="layout-width" type="number" min="64" max="2048"></label>
+            <label>高<input id="layout-height" type="number" min="64" max="2048"></label>
+            <label>图层 X<input id="layer-x" type="number" min="-1" max="2" step="0.001"></label>
+            <label>图层 Y<input id="layer-y" type="number" min="-1" max="2" step="0.001"></label>
+            <label>缩放<input id="layer-scale" type="number" min="0.05" max="8" step="0.001"></label>
+            <label>旋转<input id="layer-rotation" type="number" min="-360" max="360" step="0.001"></label>
+            <label>不透明度<input id="layer-opacity" type="number" min="0" max="1" step="0.01"></label>
+            <label>显示图层<input id="layer-visible" type="checkbox"></label>
+          </div>
+        </details>
+        <ol id="slots" class="slots"></ol>
+        <div class="row save-row">
+          <button id="save" type="button" class="primary">保存配方</button>
+          <button id="new" type="button">新建</button>
+          <label class="grow">配方 ID<input id="recipeId" autocomplete="off" spellcheck="false"></label>
+          <button id="load" type="button">恢复</button>
+        </div>
+        <div class="row"><label>历史版本<select id="recipe-history"><option value="">选择历史版本</option></select></label><button id="restore-history" type="button">恢复历史版本</button></div>
+        <p id="save-problems" class="hint"></p>
+      </section>
+
+      <section id="panel-theme" class="panel" data-panel="theme" aria-labelledby="h-theme">
+        <h2 id="h-theme">品牌配色与 Token</h2>
+        <p id="theme-note" class="hint"></p>
+        <div id="palette" class="swatches"></div>
+        <details id="tokens-box">
+          <summary>设计 Token <span id="tokens-count"></span></summary>
+          <table class="tokens"><tbody id="tokens"></tbody></table>
+        </details>
+        <div class="row">
+          <button id="theme-reset" type="button">还原默认</button>
+          <button id="theme-copy" type="button">复制 CSS 变量</button>
+        </div>
+        <div class="row">
+          <label class="grow">预设名称<input id="preset-name" maxlength="40" placeholder="例如 春季活动"></label>
+          <button id="preset-save" type="button">保存预设</button>
+        </div>
+        <div class="row">
+          <label class="grow">本机预设<select id="presets"></select></label>
+          <button id="preset-apply" type="button">应用</button>
+          <button id="preset-delete" type="button">删除</button>
+        </div>
+        <p class="hint">预设仅保存在此浏览器。主色会随配方保存；其余颜色与 Token 调整为本地预览，暂不写入服务端配方。</p>
+      </section>
+    </div>
+  </div>
 </main>
+
+<nav id="tabs" class="tabs" aria-label="工作区" hidden>
+  <button type="button" data-tab="library" aria-pressed="true">素材</button>
+  <button type="button" data-tab="canvas" aria-pressed="false">画布 <span id="tab-count"></span></button>
+  <button type="button" data-tab="theme" aria-pressed="false">主题</button>
+</nav>
+
+<dialog id="detail" aria-labelledby="detail-title">
+  <div class="dialog-head">
+    <h2 id="detail-title"></h2>
+    <button id="detail-close" type="button" aria-label="关闭详情">×</button>
+  </div>
+  <div id="detail-body"></div>
+</dialog>
+
+<dialog id="confirm">
+  <p id="confirm-text"></p>
+  <div class="row end">
+    <button id="confirm-cancel" type="button">取消</button>
+    <button id="confirm-ok" type="button" class="primary">继续</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite" hidden></div>
 <script type="module" src="/app.mjs"></script>
-</body></html>
+</body>
+</html>

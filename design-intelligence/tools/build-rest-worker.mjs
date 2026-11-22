@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 // The REST upload connector can deploy JavaScript modules without Wrangler auth.
@@ -11,11 +11,16 @@ const files = {
   '/canvas.mjs': ['text/javascript; charset=utf-8', read('public/canvas.mjs')],
   '/style.css': ['text/css; charset=utf-8', read('public/style.css')]
 };
+for (const file of readdirSync(new URL('../public/ui', import.meta.url))) {
+  if (/^[\w-]+\.mjs$/.test(file)) files['/ui/' + file] = ['text/javascript; charset=utf-8', read('public/ui/' + file)];
+}
 const headers = Object.fromEntries(read('public/_headers').split('\n').filter(line => line.startsWith('  ')).map(line => {
   const separator = line.indexOf(':');
   return [line.slice(2, separator), line.slice(separator + 1).trim()];
 }));
-const moduleText = read('src/worker.mjs').replace('export default {', 'const application = {') + `
+const recipe = read('src/recipe.mjs').replaceAll(/^export /gm, '');
+const source = read('src/worker.mjs').replace("import { recipeDocument, validId } from './recipe.mjs';", recipe);
+const moduleText = source.replace('export default {', 'const application = {') + `
 const shellFiles = ${JSON.stringify(files)};
 const shellHeaders = ${JSON.stringify(headers)};
 const staticFiles = { fetch(request) {
