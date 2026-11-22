@@ -29,3 +29,9 @@
 ## Registry and handoff
 
 Use the [Skill Registry](skill-registry.md) and [OpenAPI](../openapi.json). A Gateway-approved handoff should carry task IDs, limited asset IDs, expected output and explicit uncertainty. Grant only the task's existing brand credential. Do not embed authorization tokens, private source listings, or private screenshot bytes in a handoff packet.
+
+### Connected Drive intake verification
+
+The authorized Google Drive connector can upload into the private sandbox folder and read the exact bytes back. `tools/export-verified-drive-intake.mjs` prepares an idempotent, private D1 batch from a verified connector receipt. Operators apply that batch only to the confirmed sandbox. This management-plane import keeps Google Drive as the source, stores a downscaled protected preview and deduplicates using the verified file content. No connector token enters the Worker or repository.
+
+This workflow is separate from browser resumable upload. The browser needs an existing Google OAuth client configured for the sandbox origin and a Google user connection with access to the private intake folder. A successful connector upload provides evidence for the management-plane workflow only.
